@@ -1,0 +1,14 @@
+.textBox {
+    display: flex;
+    flex-direction: column;
+}
+
+.row {
+    display: flex;
+}
+
+.item {
+    white-space:pre;
+    font-family: monospace;
+    font-size: 16px;
+}
