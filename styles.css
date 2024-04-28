@@ -12,3 +12,7 @@
     font-family: monospace;
     font-size: 16px;
 }
+
+#highlighted {
+    background-color: cyan;
+}

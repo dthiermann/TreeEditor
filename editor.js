@@ -19,6 +19,12 @@ function getCharAt(y, x) {
     var rowChildren = rows[y].childNodes;
     return rowChildren[x].textContent;
 }
+// get div at (y,x) in grid
+function getDivAt(y, x) {
+    var rows = textBox.children;
+    var rowChildren = rows[y].children;
+    return rowChildren[x];
+}
 // set char at (y,x) to newChar
 function setCharAt(y, x, newChar) {
     var rows = textBox.childNodes;
@@ -31,4 +37,18 @@ function makeDiagonal() {
         setCharAt(i, i, "a");
     }
 }
-makeDiagonal();
+// make first row all a's 
+// make second row all b's (as a test)
+function setRow() {
+    for (var i = 0; i < 80; i++) {
+        setCharAt(0, i, "a");
+        setCharAt(1, i, "b");
+    }
+}
+// highlight the first letter
+function highlightFirst() {
+    var first = getDivAt(0, 0);
+    first.setAttribute("id", "highlighted");
+}
+setRow();
+highlightFirst();

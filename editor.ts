@@ -23,6 +23,13 @@ function getCharAt(y, x) {
     return rowChildren[x].textContent;
 }
 
+// get div at (y,x) in grid
+function getDivAt(y,x) {
+    let rows = textBox.children;
+    let rowChildren = rows[y].children;
+    return rowChildren[x];
+}
+
 // set char at (y,x) to newChar
 function setCharAt(y, x, newChar) {
     let rows = textBox.childNodes;
@@ -37,4 +44,20 @@ function makeDiagonal() {
     }
 }
 
-makeDiagonal();
+// make first row all a's 
+// make second row all b's (as a test)
+function setRow() {
+    for (let i = 0; i < 80; i++) {
+        setCharAt(0,i,"a");
+        setCharAt(1,i, "b");
+    }
+}
+
+// highlight the first letter
+function highlightFirst() {
+    let first = getDivAt(0,0);
+    first.setAttribute("id", "highlighted");
+}
+
+setRow();
+highlightFirst();
