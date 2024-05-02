@@ -2,16 +2,18 @@ var textBox = document.createElement("div");
 textBox.classList.add("textBox");
 document.body.appendChild(textBox);
 // make a grid of divs with each one containing a space
-for (var row = 0; row < 100; row++) {
-    var rowDiv = document.createElement("div");
-    rowDiv.classList.add("row");
-    for (var col = 0; col < 80; col++) {
-        var letterDiv = document.createElement("div");
-        letterDiv.classList.add("item");
-        letterDiv.textContent = " ";
-        rowDiv.appendChild(letterDiv);
+function makeEmptyTextBox(width, height) {
+    for (var row = 0; row < height; row++) {
+        var rowDiv = document.createElement("div");
+        rowDiv.classList.add("row");
+        for (var col = 0; col < width; col++) {
+            var letterDiv = document.createElement("div");
+            letterDiv.classList.add("item");
+            letterDiv.textContent = " ";
+            rowDiv.appendChild(letterDiv);
+        }
+        textBox.appendChild(rowDiv);
     }
-    textBox.appendChild(rowDiv);
 }
 // get char at (y,x) in grid
 function getCharAt(y, x) {
@@ -31,6 +33,7 @@ function setCharAt(y, x, newChar) {
     var rowChildren = rows[y].childNodes;
     rowChildren[x].textContent = newChar;
 }
+// Tests:
 // make a diagonal of a's (as a test)
 function makeDiagonal() {
     for (var i = 0; i < 50; i++) {
@@ -50,5 +53,30 @@ function highlightFirst() {
     var first = getDivAt(0, 0);
     first.setAttribute("id", "highlighted");
 }
+// highlight the rectangle at (y,x)
+function highlightAt(y, x) {
+    var position = getDivAt(y, x);
+    position.setAttribute("id", "highlighted");
+}
+// remove highlighting from rectangle at (y,x)
+function unhighlightAt(y, x) {
+    var position = getDivAt(y, x);
+    position.removeAttribute("id");
+}
+// to do:
+// implement basic key functionality
+// for some keys we want the literal keyname to be typed (like letters)
+// for others (tab, enter) we want another command to happen
+// want to parse code into a tree while we're typing
+// want to link each node in the tree with coordinates on the text grid
+// decide on formatting rules
+// copy and paste
+// undo
+// fold/hide sections
+// rename symbols
+// debugging
+// putting called functions down here
+makeEmptyTextBox(80, 100);
 setRow();
-highlightFirst();
+highlightAt(5, 5);
+unhighlightAt(5, 5);
