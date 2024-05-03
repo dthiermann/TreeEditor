@@ -7,12 +7,65 @@ document.addEventListener("keydown", handleInput);
 type mode = "input" | "command";
 
 
+// global variables here: not sure if ok stylewise
+// but they are the obvious way to handle selection and cursor position
+let mode : mode = "input";
+
+let selection = {
+    row: 0,
+    col: 0
+}
+
+// in the syntax tree, the selection will be a node
+// in the grid, the selection will be a range btw two points
+
+
 function handleInput(e) {
+    e.preventDefault();
+    let key = e.key;
+
+    if (mode == "input") {
+        insertMode(key);
+    }
+    if (mode == "command") {
+        commandMap.get(key);
+    }
+}
+
+function insertMode(key) {
+    if (insertMap.has(key)) {
+        insertMap.get(key)();
+    }
+    else {
+        insertAtCursor(key);
+    }
+}
+
+
+function insertAtCursor(key) {
     
 }
 
+function doNothing() {
+    return true;
+}
+
+
 // make a table to handle input
 // mode, key, --> some function
+let insertMap = new Map();
+
+insertMap.set("Backspace", doNothing);
+insertMap.set("Tab", doNothing);
+insertMap.set("Control", doNothing);
+insertMap.set("Alt" , doNothing);
+insertMap.set("Meta", doNothing);
+insertMap.set("ArrowUp", doNothing);
+insertMap.set("ArrowLeft", doNothing);
+insertMap.set("ArrowRight", doNothing);
+insertMap.set("ArrowDown", doNothing);
+
+let commandMap = new Map();
 
 
 // make a grid of divs with each one containing a space
@@ -107,6 +160,3 @@ function unhighlightAt(y, x) {
 
 // putting called functions down here
 makeTextSpaces(80, 100);
-setRow();
-highlightAt(5, 5);
-unhighlightAt(5,5);

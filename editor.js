@@ -1,8 +1,15 @@
 var textBox = document.createElement("div");
 textBox.classList.add("textBox");
 document.body.appendChild(textBox);
+document.addEventListener("keydown", handleInput);
+function handleInput(e) {
+    console.log(e.key);
+}
+// make a table to handle input
+// mode, key, --> some function
+var insertMap = new Map();
 // make a grid of divs with each one containing a space
-function makeEmptyTextBox(width, height) {
+function makeTextSpaces(width, height) {
     for (var row = 0; row < height; row++) {
         var rowDiv = document.createElement("div");
         rowDiv.classList.add("row");
@@ -63,6 +70,7 @@ function unhighlightAt(y, x) {
     var position = getDivAt(y, x);
     position.removeAttribute("id");
 }
+// make a table of keys that are not literal
 // to do:
 // implement basic key functionality
 // for some keys we want the literal keyname to be typed (like letters)
@@ -76,7 +84,4 @@ function unhighlightAt(y, x) {
 // rename symbols
 // debugging
 // putting called functions down here
-makeEmptyTextBox(80, 100);
-setRow();
-highlightAt(5, 5);
-unhighlightAt(5, 5);
+makeTextSpaces(80, 100);
