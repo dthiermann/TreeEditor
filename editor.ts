@@ -1,35 +1,42 @@
 let textBox = document.createElement("div");
+let firstRow = document.createElement("div");
+
+firstRow.classList.add("row");
 textBox.classList.add("textBox");
+
 document.body.appendChild(textBox);
+textBox.appendChild(firstRow);
 
 document.addEventListener("keydown", handleInput);
 
-type mode = "input" | "command";
+type mode = "insert" | "command";
 
+let currentMode : mode = "insert";
 
-// global variables here: not sure if ok stylewise
-// but they are the obvious way to handle selection and cursor position
-let mode : mode = "input";
-
-let selection = {
-    row: 0,
-    col: 0
-}
-
-// in the syntax tree, the selection will be a node
-// in the grid, the selection will be a range btw two points
+let selection = document.createElement("div");
+firstRow.appendChild(selection);
 
 
 function handleInput(e) {
     e.preventDefault();
     let key = e.key;
 
-    if (mode == "input") {
+    if (currentMode == "insert") {
         insertMode(key);
     }
-    if (mode == "command") {
-        commandMap.get(key);
+    if (currentMode == "command") {
+        commandMode(key);
     }
+}
+
+function commandMode(key) {
+    if (commandMap.has(key)) {
+        commandMap.get(key)();
+    }
+    else {
+
+    }
+    
 }
 
 function insertMode(key) {
@@ -37,13 +44,16 @@ function insertMode(key) {
         insertMap.get(key)();
     }
     else {
-        insertAtCursor(key);
+        insertBeforeSelection(key, selection);
     }
 }
 
 
-function insertAtCursor(key) {
-    
+function insertBeforeSelection(key, selection) {
+    let keyNode = document.createElement("div");
+    let selectionParent = selection.parentNode;
+    keyNode.textContent = key;
+    selectionParent.insertBefore(keyNode, selection);
 }
 
 function doNothing() {
@@ -64,6 +74,9 @@ insertMap.set("ArrowUp", doNothing);
 insertMap.set("ArrowLeft", doNothing);
 insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
+
+let shiftMap = new Map();
+
 
 let commandMap = new Map();
 
@@ -105,6 +118,16 @@ function setCharAt(y, x, newChar) {
     rowChildren[x].textContent = newChar;
 }
 
+function shiftChar(row, col, rowShift, colShift) {
+    let letter = getCharAt(row, col);
+    setCharAt(row, col, " ");
+    setCharAt(row + rowShift, col + colShift, letter);
+}
+
+// copy part of a row onto an array of chars
+// set that part of the row to blank spaces
+// 
+
 // Tests:
 
 // make a diagonal of a's (as a test)
@@ -140,23 +163,3 @@ function unhighlightAt(y, x) {
     let position = getDivAt(y, x);
     position.removeAttribute("id");
 }
-
-// make a table of keys that are not literal
-
-
-// to do:
-// implement basic key functionality
-// for some keys we want the literal keyname to be typed (like letters)
-// for others (tab, enter) we want another command to happen
-
-// want to parse code into a tree while we're typing
-// want to link each node in the tree with coordinates on the text grid
-// decide on formatting rules
-// copy and paste
-// undo
-// fold/hide sections
-// rename symbols
-// debugging
-
-// putting called functions down here
-makeTextSpaces(80, 100);

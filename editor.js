@@ -1,13 +1,61 @@
 var textBox = document.createElement("div");
+var firstRow = document.createElement("div");
+firstRow.classList.add("row");
 textBox.classList.add("textBox");
 document.body.appendChild(textBox);
+textBox.appendChild(firstRow);
 document.addEventListener("keydown", handleInput);
+var currentMode = "insert";
+var selection = document.createElement("div");
+firstRow.appendChild(selection);
 function handleInput(e) {
-    console.log(e.key);
+    e.preventDefault();
+    var key = e.key;
+    if (currentMode == "insert") {
+        insertMode(key);
+    }
+    if (currentMode == "command") {
+        commandMode(key);
+    }
+}
+function commandMode(key) {
+    if (commandMap.has(key)) {
+        commandMap.get(key)();
+    }
+    else {
+    }
+}
+function insertMode(key) {
+    if (insertMap.has(key)) {
+        insertMap.get(key)();
+    }
+    else {
+        insertBeforeSelection(key, selection);
+    }
+}
+function insertBeforeSelection(key, selection) {
+    var keyNode = document.createElement("div");
+    var selectionParent = selection.parentNode;
+    keyNode.textContent = key;
+    selectionParent.insertBefore(keyNode, selection);
+}
+function doNothing() {
+    return true;
 }
 // make a table to handle input
 // mode, key, --> some function
 var insertMap = new Map();
+insertMap.set("Backspace", doNothing);
+insertMap.set("Tab", doNothing);
+insertMap.set("Control", doNothing);
+insertMap.set("Alt", doNothing);
+insertMap.set("Meta", doNothing);
+insertMap.set("ArrowUp", doNothing);
+insertMap.set("ArrowLeft", doNothing);
+insertMap.set("ArrowRight", doNothing);
+insertMap.set("ArrowDown", doNothing);
+var shiftMap = new Map();
+var commandMap = new Map();
 // make a grid of divs with each one containing a space
 function makeTextSpaces(width, height) {
     for (var row = 0; row < height; row++) {
@@ -40,6 +88,14 @@ function setCharAt(y, x, newChar) {
     var rowChildren = rows[y].childNodes;
     rowChildren[x].textContent = newChar;
 }
+function shiftChar(row, col, rowShift, colShift) {
+    var letter = getCharAt(row, col);
+    setCharAt(row, col, " ");
+    setCharAt(row + rowShift, col + colShift, letter);
+}
+// copy part of a row onto an array of chars
+// set that part of the row to blank spaces
+// 
 // Tests:
 // make a diagonal of a's (as a test)
 function makeDiagonal() {
@@ -70,18 +126,3 @@ function unhighlightAt(y, x) {
     var position = getDivAt(y, x);
     position.removeAttribute("id");
 }
-// make a table of keys that are not literal
-// to do:
-// implement basic key functionality
-// for some keys we want the literal keyname to be typed (like letters)
-// for others (tab, enter) we want another command to happen
-// want to parse code into a tree while we're typing
-// want to link each node in the tree with coordinates on the text grid
-// decide on formatting rules
-// copy and paste
-// undo
-// fold/hide sections
-// rename symbols
-// debugging
-// putting called functions down here
-makeTextSpaces(80, 100);
