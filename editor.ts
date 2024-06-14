@@ -56,6 +56,15 @@ function insertBeforeSelection(key, selection) {
     selectionParent.insertBefore(keyNode, selection);
 }
 
+function deleteBeforeSelection() {
+    // if selection has a left sibling, delete that node
+    // otherwise, do nothing
+    let leftSibling = selection.previousSibling;
+    if (leftSibling != null && selection.parentNode) {
+        selection.parentNode.removeChild(leftSibling);
+    }
+}
+
 function doNothing() {
     return true;
 }
@@ -65,7 +74,7 @@ function doNothing() {
 // mode, key, --> some function
 let insertMap = new Map();
 
-insertMap.set("Backspace", doNothing);
+insertMap.set("Backspace", deleteBeforeSelection);
 insertMap.set("Tab", doNothing);
 insertMap.set("Control", doNothing);
 insertMap.set("Alt" , doNothing);
