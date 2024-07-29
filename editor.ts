@@ -1,20 +1,55 @@
 let textBox = document.createElement("div");
-let firstRow = document.createElement("div");
-
-firstRow.classList.add("row");
 textBox.classList.add("textBox");
-
 document.body.appendChild(textBox);
-textBox.appendChild(firstRow);
 
 document.addEventListener("keydown", handleInput);
 
+makeTextSpaces(100, 150);
+
 type mode = "insert" | "command";
 
-let currentMode : mode = "insert";
+type treeNode = {
+    leftChild: treeNode;
+    rightChild: treeNode;
+    parent: treeNode;
+}
 
-let selection = document.createElement("div");
-firstRow.appendChild(selection);
+type Interval = {
+    start: Position;
+    end: Position;
+};
+
+type Position = {
+    y: number;
+    x: number;
+};
+
+let currentMode : mode = "insert";
+let currentSelection : Interval = {
+    start: { y: 0, x: 0 },
+    end: {y: 0, x: 1}
+};
+
+
+
+/*
+insertion should be done before selection
+cursor is a special case of selection where selection.start = selection.end
+the first highlighted char is selection.start
+the last highlighted char is selection.end
+
+for adding a line-break, we need to 
+shift everything below the current line down by one
+take all the chars on the current line (starting with selection)
+ and move them down to the start of the new blank line
+
+
+*/
+
+function insertLineBreakBeforeSelection(selection) {
+
+
+}
 
 
 function handleInput(e) {
@@ -33,9 +68,6 @@ function commandMode(key) {
     if (commandMap.has(key)) {
         commandMap.get(key)();
     }
-    else {
-
-    }
     
 }
 
@@ -44,16 +76,21 @@ function insertMode(key) {
         insertMap.get(key)();
     }
     else {
-        insertBeforeSelection(key, selection);
+        insertBeforeSelection(key, currentSelection);
     }
 }
 
 
+function copyIntoArray(range : Interval) {
+    let arr = [];
+}
+
 function insertBeforeSelection(key, selection) {
-    let keyNode = document.createElement("div");
-    let selectionParent = selection.parentNode;
-    keyNode.textContent = key;
-    selectionParent.insertBefore(keyNode, selection);
+    // copy the range (selection.start, end of first row) to array
+    // set (selection.start, end of first row) to spaces
+    // copy 
+    // move selection segment + rest of line one char to right
+    // insert new char
 }
 
 function deleteBeforeSelection() {
@@ -83,6 +120,11 @@ insertMap.set("ArrowUp", doNothing);
 insertMap.set("ArrowLeft", doNothing);
 insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
+insertMap.set("Space", insertSpace);
+
+function insertSpace() {
+    insertBeforeSelection(" ", selection);
+}
 
 let shiftMap = new Map();
 
@@ -91,6 +133,7 @@ let commandMap = new Map();
 
 
 // make a grid of divs with each one containing a space
+// appends the grid to textBox div
 function makeTextSpaces(width, height) {
     for (let row = 0; row < height; row ++) {
         let rowDiv = document.createElement("div");
@@ -133,9 +176,22 @@ function shiftChar(row, col, rowShift, colShift) {
     setCharAt(row + rowShift, col + colShift, letter);
 }
 
-// copy part of a row onto an array of chars
-// set that part of the row to blank spaces
-// 
+function shiftPositionRight(position : Position, shift) {
+    let newPosition = {
+        y: position.y,
+        x: position.x + shift
+    }
+    return newPosition;
+}
+
+function shiftPositionDown(position : Position, shift) {
+    let newPosition = {
+        y: position.y + shift,
+        x: position.x
+    }
+    return newPosition;
+}
+
 
 // Tests:
 

@@ -1,13 +1,26 @@
 var textBox = document.createElement("div");
-var firstRow = document.createElement("div");
-firstRow.classList.add("row");
 textBox.classList.add("textBox");
 document.body.appendChild(textBox);
-textBox.appendChild(firstRow);
 document.addEventListener("keydown", handleInput);
 var currentMode = "insert";
-var selection = document.createElement("div");
-firstRow.appendChild(selection);
+var currentSelection = {
+    start: { y: 0, x: 0 },
+    end: { y: 0, x: 1 }
+};
+// line breaks:
+// split line into beforeSelection + (selection and after)
+// make a new line and
+// move (selection and after) to new line
+/*
+for adding a line-break, we need to
+shift everything below the current line down by one
+take all the chars on the current line (starting with selection)
+ and move them down to the start of the new blank line
+
+
+*/
+function insertLineBreakBeforeSelection(selection) {
+}
 function handleInput(e) {
     e.preventDefault();
     var key = e.key;
@@ -22,8 +35,6 @@ function commandMode(key) {
     if (commandMap.has(key)) {
         commandMap.get(key)();
     }
-    else {
-    }
 }
 function insertMode(key) {
     if (insertMap.has(key)) {
@@ -37,6 +48,7 @@ function insertBeforeSelection(key, selection) {
     var keyNode = document.createElement("div");
     var selectionParent = selection.parentNode;
     keyNode.textContent = key;
+    keyNode.classList.add("item");
     selectionParent.insertBefore(keyNode, selection);
 }
 function deleteBeforeSelection() {
@@ -62,6 +74,10 @@ insertMap.set("ArrowUp", doNothing);
 insertMap.set("ArrowLeft", doNothing);
 insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
+insertMap.set("Space", insertSpace);
+function insertSpace() {
+    insertBeforeSelection(" ", selection);
+}
 var shiftMap = new Map();
 var commandMap = new Map();
 // make a grid of divs with each one containing a space
@@ -101,9 +117,6 @@ function shiftChar(row, col, rowShift, colShift) {
     setCharAt(row, col, " ");
     setCharAt(row + rowShift, col + colShift, letter);
 }
-// copy part of a row onto an array of chars
-// set that part of the row to blank spaces
-// 
 // Tests:
 // make a diagonal of a's (as a test)
 function makeDiagonal() {
