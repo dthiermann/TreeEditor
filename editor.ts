@@ -4,7 +4,7 @@ document.body.appendChild(textBox);
 
 document.addEventListener("keydown", handleInput);
 
-makeTextSpaces(100, 150);
+newDocument(100, 150);
 
 type mode = "insert" | "command";
 
@@ -27,9 +27,32 @@ type Position = {
 let currentMode : mode = "insert";
 let currentSelection : Interval = {
     start: { y: 0, x: 0 },
-    end: {y: 0, x: 1}
+    end: {y: 0, x: 0}
 };
 
+function shiftEverythingRight(range : Interval, shift) {
+    let newStart = shiftPositionRight(range.start, shift);
+    let newEnd = shiftPositionRight(range.end, shift);
+
+    // shift highlighting
+    let y = range.start.y
+    for (let i = range.start.x; i <= range.end.x; i++) {
+        unhighlightAt(y, i);
+    }
+
+    for (let k = newStart.x; k <= newEnd.x; k++) {
+        highlightAt(y, k);
+    }
+
+    // shift text
+    for (let i = range.end.x; i >= range.start.x; i--) {
+        let letter = getCharAt(y, i);
+        setCharAt(y, i + shift, letter);
+    }
+
+    currentSelection = {start: newStart, end: newEnd};
+
+}
 
 
 /*
@@ -42,6 +65,13 @@ for adding a line-break, we need to
 shift everything below the current line down by one
 take all the chars on the current line (starting with selection)
  and move them down to the start of the new blank line
+
+Steps:
+highlight the (0,0) div
+insert text in a sequence before this div
+
+
+
 
 
 */
@@ -76,7 +106,7 @@ function insertMode(key) {
         insertMap.get(key)();
     }
     else {
-        insertBeforeSelection(key, currentSelection);
+        insertBeforeSelection(key);
     }
 }
 
@@ -85,15 +115,30 @@ function copyIntoArray(range : Interval) {
     let arr = [];
 }
 
-function insertBeforeSelection(key, selection) {
-    // copy the range (selection.start, end of first row) to array
-    // set (selection.start, end of first row) to spaces
-    // copy 
-    // move selection segment + rest of line one char to right
-    // insert new char
+let lineEndIndices = new Map();
+lineEndIndices.set(0,0);
+
+function insertBeforeSelection(key) {
+    // shift end line to the right by one
+    // we are shifting the text and the highlighting of the selection
+    // if we hit the end of the line, we will just lose the extra chars for now
+    // we need to keep track of the index of the last char in a line
+    // we will have a table of (rowNumber : lineEndIndex) pairs
+    let rowNumber = currentSelection.start.y;
+    let endOfLine = lineEndIndices.get(rowNumber);
+    let selectionLength = currentSelection.end.x - currentSelection.start.x + 1;
+
+    lineEndIndices.set(rowNumber, endOfLine + selectionLength);
+
+    let endPosition : Position = { y: rowNumber, x: endOfLine};
+    let range : Interval = { start: currentSelection.start, end: endPosition};
+    
+    shiftEverythingRight(range, 1);
+    setCharAt(rowNumber, currentSelection.start.x, key);
+
 }
 
-function deleteBeforeSelection() {
+function deleteBeforeSelection(selection) {
     // if selection has a left sibling, delete that node
     // otherwise, do nothing
     let leftSibling = selection.previousSibling;
@@ -123,7 +168,7 @@ insertMap.set("ArrowDown", doNothing);
 insertMap.set("Space", insertSpace);
 
 function insertSpace() {
-    insertBeforeSelection(" ", selection);
+    insertBeforeSelection(" ");
 }
 
 let shiftMap = new Map();
@@ -134,7 +179,7 @@ let commandMap = new Map();
 
 // make a grid of divs with each one containing a space
 // appends the grid to textBox div
-function makeTextSpaces(width, height) {
+function newDocument(width, height) {
     for (let row = 0; row < height; row ++) {
         let rowDiv = document.createElement("div");
         rowDiv.classList.add("row");
@@ -147,6 +192,7 @@ function makeTextSpaces(width, height) {
         }
         textBox.appendChild(rowDiv);
     }
+    highlightAt(0,0);
 }
 
 // get char at (y,x) in grid
@@ -192,24 +238,6 @@ function shiftPositionDown(position : Position, shift) {
     return newPosition;
 }
 
-
-// Tests:
-
-// make a diagonal of a's (as a test)
-function makeDiagonal() {
-    for (let i = 0; i < 50; i++) {
-    setCharAt(i,i, "a");
-    }
-}
-
-// make first row all a's 
-// make second row all b's (as a test)
-function setRow() {
-    for (let i = 0; i < 80; i++) {
-        setCharAt(0,i,"a");
-        setCharAt(1,i, "b");
-    }
-}
 
 // highlight the first letter
 function highlightFirst() {

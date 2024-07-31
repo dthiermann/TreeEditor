@@ -2,20 +2,47 @@ var textBox = document.createElement("div");
 textBox.classList.add("textBox");
 document.body.appendChild(textBox);
 document.addEventListener("keydown", handleInput);
+newDocument(100, 150);
 var currentMode = "insert";
 var currentSelection = {
     start: { y: 0, x: 0 },
-    end: { y: 0, x: 1 }
+    end: { y: 0, x: 0 }
 };
-// line breaks:
-// split line into beforeSelection + (selection and after)
-// make a new line and
-// move (selection and after) to new line
+function shiftEverythingRight(range, shift) {
+    var newStart = shiftPositionRight(range.start, shift);
+    var newEnd = shiftPositionRight(range.end, shift);
+    // shift highlighting
+    var y = range.start.y;
+    for (var i = range.start.x; i <= range.end.x; i++) {
+        unhighlightAt(y, i);
+    }
+    for (var k = newStart.x; k <= newEnd.x; k++) {
+        highlightAt(y, k);
+    }
+    // shift text
+    for (var i = range.end.x; i >= range.start.x; i--) {
+        var letter = getCharAt(y, i);
+        setCharAt(y, i + shift, letter);
+    }
+    currentSelection = { start: newStart, end: newEnd };
+}
 /*
+insertion should be done before selection
+cursor is a special case of selection where selection.start = selection.end
+the first highlighted char is selection.start
+the last highlighted char is selection.end
+
 for adding a line-break, we need to
 shift everything below the current line down by one
 take all the chars on the current line (starting with selection)
  and move them down to the start of the new blank line
+
+Steps:
+highlight the (0,0) div
+insert text in a sequence before this div
+
+
+
 
 
 */
@@ -41,17 +68,30 @@ function insertMode(key) {
         insertMap.get(key)();
     }
     else {
-        insertBeforeSelection(key, selection);
+        insertBeforeSelection(key);
     }
 }
-function insertBeforeSelection(key, selection) {
-    var keyNode = document.createElement("div");
-    var selectionParent = selection.parentNode;
-    keyNode.textContent = key;
-    keyNode.classList.add("item");
-    selectionParent.insertBefore(keyNode, selection);
+function copyIntoArray(range) {
+    var arr = [];
 }
-function deleteBeforeSelection() {
+var lineEndIndices = new Map();
+lineEndIndices.set(0, 0);
+function insertBeforeSelection(key) {
+    // shift end line to the right by one
+    // we are shifting the text and the highlighting of the selection
+    // if we hit the end of the line, we will just lose the extra chars for now
+    // we need to keep track of the index of the last char in a line
+    // we will have a table of (rowNumber : lineEndIndex) pairs
+    var rowNumber = currentSelection.start.y;
+    var endOfLine = lineEndIndices.get(rowNumber);
+    var selectionLength = currentSelection.end.x - currentSelection.start.x + 1;
+    lineEndIndices.set(rowNumber, endOfLine + selectionLength);
+    var endPosition = { y: rowNumber, x: endOfLine };
+    var range = { start: currentSelection.start, end: endPosition };
+    shiftEverythingRight(range, 1);
+    setCharAt(rowNumber, currentSelection.start.x, key);
+}
+function deleteBeforeSelection(selection) {
     // if selection has a left sibling, delete that node
     // otherwise, do nothing
     var leftSibling = selection.previousSibling;
@@ -76,12 +116,13 @@ insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
 insertMap.set("Space", insertSpace);
 function insertSpace() {
-    insertBeforeSelection(" ", selection);
+    insertBeforeSelection(" ");
 }
 var shiftMap = new Map();
 var commandMap = new Map();
 // make a grid of divs with each one containing a space
-function makeTextSpaces(width, height) {
+// appends the grid to textBox div
+function newDocument(width, height) {
     for (var row = 0; row < height; row++) {
         var rowDiv = document.createElement("div");
         rowDiv.classList.add("row");
@@ -93,6 +134,7 @@ function makeTextSpaces(width, height) {
         }
         textBox.appendChild(rowDiv);
     }
+    highlightAt(0, 0);
 }
 // get char at (y,x) in grid
 function getCharAt(y, x) {
@@ -117,20 +159,19 @@ function shiftChar(row, col, rowShift, colShift) {
     setCharAt(row, col, " ");
     setCharAt(row + rowShift, col + colShift, letter);
 }
-// Tests:
-// make a diagonal of a's (as a test)
-function makeDiagonal() {
-    for (var i = 0; i < 50; i++) {
-        setCharAt(i, i, "a");
-    }
+function shiftPositionRight(position, shift) {
+    var newPosition = {
+        y: position.y,
+        x: position.x + shift
+    };
+    return newPosition;
 }
-// make first row all a's 
-// make second row all b's (as a test)
-function setRow() {
-    for (var i = 0; i < 80; i++) {
-        setCharAt(0, i, "a");
-        setCharAt(1, i, "b");
-    }
+function shiftPositionDown(position, shift) {
+    var newPosition = {
+        y: position.y + shift,
+        x: position.x
+    };
+    return newPosition;
 }
 // highlight the first letter
 function highlightFirst() {
