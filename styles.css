@@ -18,7 +18,7 @@
     font-size: 16px;
 }
 
-.selection {
+#selection {
     background-color: cyan;
     white-space:break-spaces;
 }

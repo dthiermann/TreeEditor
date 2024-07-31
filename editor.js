@@ -173,6 +173,7 @@ function shiftPositionDown(position, shift) {
     };
     return newPosition;
 }
+highlightFirst();
 // highlight the first letter
 function highlightFirst() {
     var first = getDivAt(0, 0);
@@ -181,7 +182,7 @@ function highlightFirst() {
 // highlight the rectangle at (y,x)
 function highlightAt(y, x) {
     var position = getDivAt(y, x);
-    position.setAttribute("id", "highlighted");
+    position.setAttribute("id", "selection");
 }
 // remove highlighting from rectangle at (y,x)
 function unhighlightAt(y, x) {

@@ -238,6 +238,7 @@ function shiftPositionDown(position : Position, shift) {
     return newPosition;
 }
 
+highlightFirst();
 
 // highlight the first letter
 function highlightFirst() {
@@ -248,7 +249,7 @@ function highlightFirst() {
 // highlight the rectangle at (y,x)
 function highlightAt(y, x) {
     let position = getDivAt(y, x);
-    position.setAttribute("id", "highlighted");
+    position.setAttribute("id", "selection");
 }
 
 // remove highlighting from rectangle at (y,x)
