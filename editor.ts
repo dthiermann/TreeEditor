@@ -14,21 +14,59 @@ type treeNode = {
     parent: treeNode;
 }
 
+// an interval is a contiguous range of positions on a single line
+// when an interval is selected,
+// the first highlighted spot is (row, start)
+// the last highlighted spot is (row, end)
 type Interval = {
-    start: Position;
-    end: Position;
+    row: number;
+    start: number;
+    end: number;
 };
 
 type Position = {
-    y: number;
+    row: number;
     x: number;
 };
 
 let currentMode : mode = "insert";
 let currentSelection : Interval = {
-    start: { y: 0, x: 0 },
-    end: {y: 0, x: 0}
+    row : 0,
+    start: 0,
+    end: 0
 };
+
+// set every char in an interval to the same char: letter
+function setIntervalTo(range : Interval, letter) {
+    for (let i = range.start; i <= range.end; i++) {
+        setCharAt(range.row, i, letter);
+    }
+}
+
+// copy the text from an interval into an array
+// return that array
+function copyTextToArray(range: Interval) {
+    let text : string[] = [];
+
+    for (let i = range.start; i <= range.end; i++) {
+        text.push(getCharAt(range.row, i));
+    }
+
+    return text;
+}
+
+function copyArrayToPosition(textArray, start : Position) {
+    for (let i = 0; i < textArray.length; i ++) {
+        setCharAt(start.row, start.x + i, textArray[i]);
+    }
+}
+
+// moving selection involves
+// moving the text in the selection range
+// updating the highlighting
+// updating the selection variable
+
+// deleting
 
 function shiftEverythingRight(range : Interval, shift) {
     let newStart = shiftPositionRight(range.start, shift);
@@ -70,11 +108,46 @@ Steps:
 highlight the (0,0) div
 insert text in a sequence before this div
 
-
-
+delete selection:
+lineBefore - selection - lineAfter
+-set selection to whitespace
+moving selection and highlighting to last char of lineBefore
+moving lineAfter back by selectionLength
 
 
 */
+function unhighlightInterval(range : Interval) {
+    for (let i = range.start; i <= range.end; i ++) {
+        unhighlightAt(range.row, i);
+    }
+}
+
+function highlightInterval(range : Interval) {
+    for (let i = range.start; i <= range.end; i++) {
+        highlightAt(range.row, i);
+    }
+}
+
+// updates currentSelection variable
+// updates highlighting
+// does not move any text
+function setSelection(newRange : Interval) {
+    unhighlightInterval(currentSelection);
+    currentSelection = newRange;
+
+    highlightInterval(newRange);
+
+}
+
+function deleteSelection() {
+    let selectionLength = currentSelection.end - currentSelection.start + 1;
+    // set all the selection to spaces
+
+    setIntervalTo(currentSelection, " ");
+
+
+    
+}
 
 function insertLineBreakBeforeSelection(selection) {
 
@@ -110,11 +183,6 @@ function insertMode(key) {
     }
 }
 
-
-function copyIntoArray(range : Interval) {
-    let arr = [];
-}
-
 let lineEndIndices = new Map();
 lineEndIndices.set(0,0);
 
@@ -130,7 +198,7 @@ function insertBeforeSelection(key) {
 
     lineEndIndices.set(rowNumber, endOfLine + selectionLength);
 
-    let endPosition : Position = { y: rowNumber, x: endOfLine};
+    let endPosition : Position = { row: rowNumber, x: endOfLine};
     let range : Interval = { start: currentSelection.start, end: endPosition};
     
     shiftEverythingRight(range, 1);
@@ -138,14 +206,8 @@ function insertBeforeSelection(key) {
 
 }
 
-function deleteBeforeSelection(selection) {
-    // if selection has a left sibling, delete that node
-    // otherwise, do nothing
-    let leftSibling = selection.previousSibling;
-    if (leftSibling != null && selection.parentNode) {
-        selection.parentNode.removeChild(leftSibling);
-    }
-}
+// assuming selection is all on one line
+
 
 function doNothing() {
     return true;
@@ -156,7 +218,7 @@ function doNothing() {
 // mode, key, --> some function
 let insertMap = new Map();
 
-insertMap.set("Backspace", deleteBeforeSelection);
+insertMap.set("Backspace", deleteSelection);
 insertMap.set("Tab", doNothing);
 insertMap.set("Control", doNothing);
 insertMap.set("Alt" , doNothing);
@@ -196,7 +258,7 @@ function newDocument(width, height) {
 }
 
 // get char at (y,x) in grid
-function getCharAt(y, x) {
+function getCharAt(y : number, x : number) : string {
     let rows = textBox.childNodes;
     let rowChildren = rows[y].childNodes;
     return rowChildren[x].textContent;
@@ -224,7 +286,7 @@ function shiftChar(row, col, rowShift, colShift) {
 
 function shiftPositionRight(position : Position, shift) {
     let newPosition = {
-        y: position.y,
+        y: position.row,
         x: position.x + shift
     }
     return newPosition;
@@ -232,28 +294,21 @@ function shiftPositionRight(position : Position, shift) {
 
 function shiftPositionDown(position : Position, shift) {
     let newPosition = {
-        y: position.y + shift,
+        y: position.row + shift,
         x: position.x
     }
     return newPosition;
 }
 
-highlightFirst();
-
-// highlight the first letter
-function highlightFirst() {
-    let first = getDivAt(0,0);
-    first.setAttribute("id", "highlighted");
-}
 
 // highlight the rectangle at (y,x)
-function highlightAt(y, x) {
-    let position = getDivAt(y, x);
+function highlightAt(row, x) {
+    let position = getDivAt(row, x);
     position.setAttribute("id", "selection");
 }
 
 // remove highlighting from rectangle at (y,x)
-function unhighlightAt(y, x) {
-    let position = getDivAt(y, x);
+function unhighlightAt(row, x) {
+    let position = getDivAt(row, x);
     position.removeAttribute("id");
 }

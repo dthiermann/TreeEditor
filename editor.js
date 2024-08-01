@@ -91,12 +91,19 @@ function insertBeforeSelection(key) {
     shiftEverythingRight(range, 1);
     setCharAt(rowNumber, currentSelection.start.x, key);
 }
-function deleteBeforeSelection(selection) {
-    // if selection has a left sibling, delete that node
-    // otherwise, do nothing
-    var leftSibling = selection.previousSibling;
-    if (leftSibling != null && selection.parentNode) {
-        selection.parentNode.removeChild(leftSibling);
+// assuming selection is all on one line
+function deleteSelection() {
+    var selectionLength = currentSelection.end.x - currentSelection.start.x + 1;
+    // set all the selection to spaces
+    var row = currentSelection.start.y;
+    for (var i = currentSelection.start.x; i <= currentSelection.end.x; i++) {
+        setCharAt(row, i, " ");
+    }
+    // move the part of the line after the selection left
+    var endOfLine = lineEndIndices.get(row);
+    for (var k = currentSelection.end.x + 1; k <= endOfLine; k++) {
+        var letter = getCharAt(row, k);
+        setCharAt(row, k - selectionLength, letter);
     }
 }
 function doNothing() {
@@ -105,7 +112,7 @@ function doNothing() {
 // make a table to handle input
 // mode, key, --> some function
 var insertMap = new Map();
-insertMap.set("Backspace", deleteBeforeSelection);
+insertMap.set("Backspace", deleteSelection);
 insertMap.set("Tab", doNothing);
 insertMap.set("Control", doNothing);
 insertMap.set("Alt", doNothing);
