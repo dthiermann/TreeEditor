@@ -5,26 +5,37 @@ document.addEventListener("keydown", handleInput);
 newDocument(100, 150);
 var currentMode = "insert";
 var currentSelection = {
-    start: { y: 0, x: 0 },
-    end: { y: 0, x: 0 }
+    row: 0,
+    start: 0,
+    end: 0
 };
-function shiftEverythingRight(range, shift) {
-    var newStart = shiftPositionRight(range.start, shift);
-    var newEnd = shiftPositionRight(range.end, shift);
-    // shift highlighting
-    var y = range.start.y;
-    for (var i = range.start.x; i <= range.end.x; i++) {
-        unhighlightAt(y, i);
+// set every char in an interval to the same char: letter
+function setIntervalTo(range, letter) {
+    for (var i = range.start; i <= range.end; i++) {
+        setCharAt(range.row, i, letter);
     }
-    for (var k = newStart.x; k <= newEnd.x; k++) {
-        highlightAt(y, k);
+}
+// copy the text from an interval into an array
+// return that array
+function copyTextToArray(range) {
+    var text = [];
+    for (var i = range.start; i <= range.end; i++) {
+        text.push(getCharAt(range.row, i));
     }
-    // shift text
-    for (var i = range.end.x; i >= range.start.x; i--) {
-        var letter = getCharAt(y, i);
-        setCharAt(y, i + shift, letter);
+    return text;
+}
+function copyArrayToPosition(textArray, range) {
+    for (var i = 0; i < textArray.length; i++) {
+        setCharAt(range.row, range.start + i, textArray[i]);
     }
-    currentSelection = { start: newStart, end: newEnd };
+}
+// move the text in range to newStart
+// this leaves whitespace in some or all of range
+// this will overwrite preexisting text after newStart
+function moveText(range, newStart) {
+    var textArray = copyTextToArray(range);
+    setIntervalTo(range, " ");
+    copyArrayToPosition(textArray, newStart);
 }
 /*
 insertion should be done before selection
@@ -41,11 +52,55 @@ Steps:
 highlight the (0,0) div
 insert text in a sequence before this div
 
-
-
+delete selection:
+lineBefore - selection - lineAfter
+-set selection to whitespace
+moving selection and highlighting to last char of lineBefore
+moving lineAfter back by selectionLength
 
 
 */
+function unhighlightInterval(range) {
+    for (var i = range.start; i <= range.end; i++) {
+        unhighlightAt(range.row, i);
+    }
+}
+function highlightInterval(range) {
+    for (var i = range.start; i <= range.end; i++) {
+        highlightAt(range.row, i);
+    }
+}
+// updates currentSelection variable
+// updates highlighting
+// does not move any text
+function setSelection(newRange) {
+    unhighlightInterval(currentSelection);
+    currentSelection = newRange;
+    highlightInterval(newRange);
+}
+function shiftText(range, shift) {
+    moveText(range, shiftIntervalRight(range, shift));
+}
+function deleteSelection() {
+    var currentRow = currentSelection.row;
+    var currentStart = currentSelection.start;
+    var currentEnd = currentSelection.end;
+    var selectionLength = currentEnd - currentStart + 1;
+    var endOfLine = lineEndIndices.get(currentRow);
+    var newCursor = {
+        start: currentStart - 1,
+        end: currentStart - 1,
+        row: currentRow
+    };
+    var afterSelection = {
+        row: currentRow,
+        start: currentSelection.end + 1,
+        end: endOfLine
+    };
+    setIntervalTo(currentSelection, " ");
+    shiftText(afterSelection, -selectionLength);
+    setSelection(newCursor);
+}
 function insertLineBreakBeforeSelection(selection) {
 }
 function handleInput(e) {
@@ -71,40 +126,22 @@ function insertMode(key) {
         insertBeforeSelection(key);
     }
 }
-function copyIntoArray(range) {
-    var arr = [];
-}
 var lineEndIndices = new Map();
 lineEndIndices.set(0, 0);
 function insertBeforeSelection(key) {
-    // shift end line to the right by one
-    // we are shifting the text and the highlighting of the selection
-    // if we hit the end of the line, we will just lose the extra chars for now
-    // we need to keep track of the index of the last char in a line
-    // we will have a table of (rowNumber : lineEndIndex) pairs
-    var rowNumber = currentSelection.start.y;
-    var endOfLine = lineEndIndices.get(rowNumber);
-    var selectionLength = currentSelection.end.x - currentSelection.start.x + 1;
-    lineEndIndices.set(rowNumber, endOfLine + selectionLength);
-    var endPosition = { y: rowNumber, x: endOfLine };
-    var range = { start: currentSelection.start, end: endPosition };
-    shiftEverythingRight(range, 1);
-    setCharAt(rowNumber, currentSelection.start.x, key);
-}
-// assuming selection is all on one line
-function deleteSelection() {
-    var selectionLength = currentSelection.end.x - currentSelection.start.x + 1;
-    // set all the selection to spaces
-    var row = currentSelection.start.y;
-    for (var i = currentSelection.start.x; i <= currentSelection.end.x; i++) {
-        setCharAt(row, i, " ");
-    }
-    // move the part of the line after the selection left
-    var endOfLine = lineEndIndices.get(row);
-    for (var k = currentSelection.end.x + 1; k <= endOfLine; k++) {
-        var letter = getCharAt(row, k);
-        setCharAt(row, k - selectionLength, letter);
-    }
+    var currentRow = currentSelection.row;
+    var endOfLine = lineEndIndices.get(currentRow);
+    var afterSelection = {
+        row: currentRow,
+        start: currentSelection.end + 1,
+        end: endOfLine
+    };
+    // shift everything after the selection to the right by 1
+    shiftText(afterSelection, 1);
+    // shift selection to the right by 1
+    setSelection(shiftIntervalRight(currentSelection, 1));
+    // insert key right before the start of new selection
+    setCharAt(currentRow, currentSelection.start - 1, key);
 }
 function doNothing() {
     return true;
@@ -168,31 +205,34 @@ function shiftChar(row, col, rowShift, colShift) {
 }
 function shiftPositionRight(position, shift) {
     var newPosition = {
-        y: position.y,
+        y: position.row,
         x: position.x + shift
     };
     return newPosition;
 }
+function shiftIntervalRight(range, shift) {
+    var row = range.row;
+    var newRange = {
+        row: row,
+        start: range.start + shift,
+        end: range.end + shift
+    };
+    return newRange;
+}
 function shiftPositionDown(position, shift) {
     var newPosition = {
-        y: position.y + shift,
+        y: position.row + shift,
         x: position.x
     };
     return newPosition;
 }
-highlightFirst();
-// highlight the first letter
-function highlightFirst() {
-    var first = getDivAt(0, 0);
-    first.setAttribute("id", "highlighted");
-}
 // highlight the rectangle at (y,x)
-function highlightAt(y, x) {
-    var position = getDivAt(y, x);
+function highlightAt(row, x) {
+    var position = getDivAt(row, x);
     position.setAttribute("id", "selection");
 }
 // remove highlighting from rectangle at (y,x)
-function unhighlightAt(y, x) {
-    var position = getDivAt(y, x);
+function unhighlightAt(row, x) {
+    var position = getDivAt(row, x);
     position.removeAttribute("id");
 }

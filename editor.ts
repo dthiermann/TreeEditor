@@ -55,43 +55,21 @@ function copyTextToArray(range: Interval) {
     return text;
 }
 
-function copyArrayToPosition(textArray, start : Position) {
+function copyArrayToPosition(textArray, range : Interval) {
     for (let i = 0; i < textArray.length; i ++) {
-        setCharAt(start.row, start.x + i, textArray[i]);
+        setCharAt(range.row, range.start + i, textArray[i]);
     }
 }
 
-// moving selection involves
-// moving the text in the selection range
-// updating the highlighting
-// updating the selection variable
+// move the text in range to newStart
+// this leaves whitespace in some or all of range
+// this will overwrite preexisting text after newStart
+function moveText(range : Interval, newStart : Interval) {
+    let textArray = copyTextToArray(range);
+    setIntervalTo(range, " ");
 
-// deleting
-
-function shiftEverythingRight(range : Interval, shift) {
-    let newStart = shiftPositionRight(range.start, shift);
-    let newEnd = shiftPositionRight(range.end, shift);
-
-    // shift highlighting
-    let y = range.start.y
-    for (let i = range.start.x; i <= range.end.x; i++) {
-        unhighlightAt(y, i);
-    }
-
-    for (let k = newStart.x; k <= newEnd.x; k++) {
-        highlightAt(y, k);
-    }
-
-    // shift text
-    for (let i = range.end.x; i >= range.start.x; i--) {
-        let letter = getCharAt(y, i);
-        setCharAt(y, i + shift, letter);
-    }
-
-    currentSelection = {start: newStart, end: newEnd};
-
+    copyArrayToPosition(textArray, newStart);
 }
-
 
 /*
 insertion should be done before selection
@@ -139,13 +117,34 @@ function setSelection(newRange : Interval) {
 
 }
 
+function shiftText(range : Interval, shift) {
+    moveText(range, shiftIntervalRight(range, shift));
+}
+
 function deleteSelection() {
-    let selectionLength = currentSelection.end - currentSelection.start + 1;
-    // set all the selection to spaces
+    let currentRow = currentSelection.row;
+    let currentStart = currentSelection.start;
+    let currentEnd = currentSelection.end;
+    let selectionLength = currentEnd - currentStart + 1;
+
+    let endOfLine = lineEndIndices.get(currentRow);
+
+    let newCursor : Interval = {
+        start: currentStart - 1,
+        end: currentStart - 1,
+        row: currentRow
+    }
+
+    let afterSelection : Interval = {
+        row: currentRow,
+        start: currentSelection.end + 1,
+        end: endOfLine
+    }
 
     setIntervalTo(currentSelection, " ");
+    shiftText(afterSelection, - selectionLength);
 
-
+    setSelection(newCursor);
     
 }
 
@@ -187,26 +186,25 @@ let lineEndIndices = new Map();
 lineEndIndices.set(0,0);
 
 function insertBeforeSelection(key) {
-    // shift end line to the right by one
-    // we are shifting the text and the highlighting of the selection
-    // if we hit the end of the line, we will just lose the extra chars for now
-    // we need to keep track of the index of the last char in a line
-    // we will have a table of (rowNumber : lineEndIndex) pairs
-    let rowNumber = currentSelection.start.y;
-    let endOfLine = lineEndIndices.get(rowNumber);
-    let selectionLength = currentSelection.end.x - currentSelection.start.x + 1;
+    let currentRow = currentSelection.row;
+    let endOfLine = lineEndIndices.get(currentRow);
 
-    lineEndIndices.set(rowNumber, endOfLine + selectionLength);
+    let afterSelection : Interval = {
+        row: currentRow,
+        start: currentSelection.end + 1,
+        end: endOfLine
+    }
 
-    let endPosition : Position = { row: rowNumber, x: endOfLine};
-    let range : Interval = { start: currentSelection.start, end: endPosition};
-    
-    shiftEverythingRight(range, 1);
-    setCharAt(rowNumber, currentSelection.start.x, key);
 
+    // shift everything after the selection to the right by 1
+    shiftText(afterSelection, 1);
+
+    // shift selection to the right by 1
+    setSelection(shiftIntervalRight(currentSelection, 1));
+
+    // insert key right before the start of new selection
+    setCharAt(currentRow, currentSelection.start - 1, key);
 }
-
-// assuming selection is all on one line
 
 
 function doNothing() {
@@ -290,6 +288,17 @@ function shiftPositionRight(position : Position, shift) {
         x: position.x + shift
     }
     return newPosition;
+}
+
+function shiftIntervalRight(range : Interval, shift) {
+    let row = range.row;
+    let newRange = {
+        row: row,
+        start: range.start + shift,
+        end: range.end + shift
+    }
+
+    return newRange;
 }
 
 function shiftPositionDown(position : Position, shift) {
