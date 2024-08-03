@@ -4,7 +4,12 @@ document.body.appendChild(textBox);
 
 document.addEventListener("keydown", handleInput);
 
-newDocument(100, 150);
+let documentWidth = 100;
+let documentHeight = 150;
+
+newDocument(documentWidth, documentHeight);
+
+let documentLastRow = 0;
 
 type mode = "insert" | "command";
 
@@ -13,6 +18,12 @@ type treeNode = {
     rightChild: treeNode;
     parent: treeNode;
 }
+
+/*
+tree stores starting and ending positions for each node
+(doesn't need to store the content)
+
+*/
 
 // an interval is a contiguous range of positions on a single line
 // when an interval is selected,
@@ -29,6 +40,11 @@ type Position = {
     x: number;
 };
 
+type Block = {
+    firstRow: number;
+    lastRow: number;
+}
+
 let currentMode : mode = "insert";
 let currentSelection : Interval = {
     row : 0,
@@ -36,8 +52,32 @@ let currentSelection : Interval = {
     end: 0
 };
 
+function shiftBlockDown(section : Block, shift : number) {
+    for (let i = section.lastRow; i >= section.firstRow; i--) {
+        let line : Interval = {
+            row : i,
+            start: 0,
+            end: documentWidth      
+        };
+
+        moveText(line, i + shift, 0);
+
+    }
+    
+    for (let i = section.firstRow; i < section.firstRow + shift; i++) {
+        let line : Interval = {
+            row : i,
+            start: 0,
+            end: documentWidth
+        }
+        setIntervalText(line, " ");
+    }
+
+}
+
+
 // set every char in an interval to the same char: letter
-function setIntervalTo(range : Interval, letter) {
+function setIntervalText(range : Interval, letter) {
     for (let i = range.start; i <= range.end; i++) {
         setCharAt(range.row, i, letter);
     }
@@ -55,45 +95,22 @@ function copyTextToArray(range: Interval) {
     return text;
 }
 
-function copyArrayToPosition(textArray, range : Interval) {
+function copyArrayToPosition(textArray, newRow, newStart) {
     for (let i = 0; i < textArray.length; i ++) {
-        setCharAt(range.row, range.start + i, textArray[i]);
+        setCharAt(newRow, newStart + i, textArray[i]);
     }
 }
 
 // move the text in range to newStart
 // this leaves whitespace in some or all of range
 // this will overwrite preexisting text after newStart
-function moveText(range : Interval, newStart : Interval) {
+function moveText(range : Interval, newRow, newStart) {
     let textArray = copyTextToArray(range);
-    setIntervalTo(range, " ");
+    setIntervalText(range, " ");
 
-    copyArrayToPosition(textArray, newStart);
+    copyArrayToPosition(textArray, newRow, newStart);
 }
 
-/*
-insertion should be done before selection
-cursor is a special case of selection where selection.start = selection.end
-the first highlighted char is selection.start
-the last highlighted char is selection.end
-
-for adding a line-break, we need to 
-shift everything below the current line down by one
-take all the chars on the current line (starting with selection)
- and move them down to the start of the new blank line
-
-Steps:
-highlight the (0,0) div
-insert text in a sequence before this div
-
-delete selection:
-lineBefore - selection - lineAfter
--set selection to whitespace
-moving selection and highlighting to last char of lineBefore
-moving lineAfter back by selectionLength
-
-
-*/
 function unhighlightInterval(range : Interval) {
     for (let i = range.start; i <= range.end; i ++) {
         unhighlightAt(range.row, i);
@@ -118,7 +135,7 @@ function setSelection(newRange : Interval) {
 }
 
 function shiftText(range : Interval, shift) {
-    moveText(range, shiftIntervalRight(range, shift));
+    moveText(range, range.row, range.start + shift);
 }
 
 function deleteSelection() {
@@ -141,15 +158,51 @@ function deleteSelection() {
         end: endOfLine
     }
 
-    setIntervalTo(currentSelection, " ");
+    setIntervalText(currentSelection, " ");
     shiftText(afterSelection, - selectionLength);
 
     setSelection(newCursor);
+
+    lineEndIndices.set(currentRow, endOfLine - selectionLength);
     
 }
 
-function insertLineBreakBeforeSelection(selection) {
+function insertBlankLineBelow() {
+    let row = currentSelection.row;
+    // shift every row below down by 1
+    if (row < documentLastRow) {
+        let everythingBelow : Block = {
+            firstRow: row + 1,
+            lastRow: documentLastRow
+        }
+        shiftBlockDown(everythingBelow, 1);
+    }
+    
+    documentLastRow = documentLastRow + 1;
 
+}
+
+function insertLineBreakBeforeSelection() {
+    // shift everything below current line down by 1
+    insertBlankLineBelow();
+    // move selection text and rest of line to line below
+    let restOfLine : Interval = {
+        row: currentSelection.row,
+        start: currentSelection.start,
+        end: lineEndIndices.get(currentSelection.row)
+    }
+
+    moveText(restOfLine, currentSelection.row + 1, 0);
+
+    // move selection (highlighting + variable) to start of new line
+    let newSelection : Interval = {
+        row: currentSelection.row + 1,
+        start: 0,
+        end: currentSelection.end - currentSelection.start
+    }
+
+    setSelection(newSelection);
+    console.log(currentSelection);
 
 }
 
@@ -195,7 +248,6 @@ function insertBeforeSelection(key) {
         end: endOfLine
     }
 
-
     // shift everything after the selection to the right by 1
     shiftText(afterSelection, 1);
 
@@ -204,6 +256,8 @@ function insertBeforeSelection(key) {
 
     // insert key right before the start of new selection
     setCharAt(currentRow, currentSelection.start - 1, key);
+
+    lineEndIndices.set(currentRow, endOfLine + 1);
 }
 
 
@@ -226,6 +280,7 @@ insertMap.set("ArrowLeft", doNothing);
 insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
 insertMap.set("Space", insertSpace);
+insertMap.set("Enter", insertLineBreakBeforeSelection);
 
 function insertSpace() {
     insertBeforeSelection(" ");
@@ -296,6 +351,26 @@ function shiftIntervalRight(range : Interval, shift) {
         row: row,
         start: range.start + shift,
         end: range.end + shift
+    }
+
+    return newRange;
+}
+
+function shiftIntervalDown(range : Interval, shift) {
+    let newRange : Interval = {
+        row: range.row + shift,
+        start: range.start,
+        end: range.end
+    }
+
+    return newRange;
+}
+
+function shiftInterval(range : Interval, rightShift, downShift) {
+    let newRange : Interval = {
+        row: range.row + downShift,
+        start: range.start + rightShift,
+        end: range.end + downShift
     }
 
     return newRange;
