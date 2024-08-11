@@ -14,15 +14,86 @@ let documentLastRow = 0;
 type mode = "insert" | "command";
 
 type treeNode = {
-    leftChild: treeNode;
-    rightChild: treeNode;
-    parent: treeNode;
+    letter?: string;
+    parent?: treeNode;
+    leftChild?: treeNode;
+    leftSibling?: treeNode;
+    rightSibling?: treeNode
 }
 
-/*
-tree stores starting and ending positions for each node
-(doesn't need to store the content)
+let documentNode : treeNode = {};
+let selectedNode = documentNode;
 
+// inserts an empty node to the left of selected node
+// does not change the selection
+function insertEmptyNodeBeforeSelected() {
+    let blank : treeNode = {};
+    // need to do a lot of null checking
+    blank.rightSibling = selectedNode;
+    blank.leftSibling = selectedNode.leftSibling;
+    blank.parent = selectedNode.parent;
+
+    selectedNode.leftSibling = blank;
+}
+
+// inserts an empty node to the right of selected node
+// does not change the selection
+function insertEmptyNodeAfterSelected() {
+    let blank : treeNode = {};
+
+    blank.leftSibling = selectedNode;
+    blank.rightSibling = selectedNode.rightSibling;
+    blank.parent = selectedNode.parent;
+
+    selectedNode.rightSibling = blank;
+}
+
+function insertLetterInTree(letter) {
+
+}
+/*
+when user presses a key:
+  if we are in insert mode:
+    if the key is in the insert mode table:
+      perform the corresponding action
+    if the key is a letter:
+      we want to insert the letter in the right place in the ui relative to the selection
+      we want to insert the letter in the tree:
+        some different possiblities:
+          cursor is an empty node, and we are inserting the letter before/after it
+          cursor is a letter node, and we are inserting the letter before/after it
+        
+  if we are in command mode:
+    look the key up in the command table and do the corresponding action
+
+tree actions (controlled by non-letter keys):
+  if the currently selected node is a list of letters, add new letter to the end
+  select right sibling node (if exists)
+  select left sibling node (if exists)
+  select parent node (if exists)
+  select first child node (if exists)
+  make a new empty node to the right of selected node
+  add a new empty node at the end of the children of current selection
+
+we need some way of
+  getting left sibling of node
+  getting right sibling of node
+  getting parent of node
+  getting first child of node
+  adding empty node to left of node
+  adding empty node to right
+  adding letter to end of word node
+  adding new empty node to children
+
+typing a letter adds the letter to current word
+typing space starts a new empty list to the right of current and selects it
+typing leftParens: if current list is empty, add an empty list inside it, and select that
+typing rightParens selects the parent node
+
+For testing purposes, it would be nice to have a way to uniformly
+display trees in the ui, aka a print function for expressions
+
+(a b c (d e f))
 */
 
 // an interval is a contiguous range of positions on a single line
@@ -232,6 +303,7 @@ function insertMode(key) {
     }
     else {
         insertBeforeSelection(key);
+        currentList.push(key);
     }
 }
 
@@ -284,6 +356,7 @@ insertMap.set("Enter", insertLineBreakBeforeSelection);
 
 function insertSpace() {
     insertBeforeSelection(" ");
+
 }
 
 let shiftMap = new Map();
