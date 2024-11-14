@@ -1,12 +1,100 @@
+// simple version of application:
+// user is working in a single file / module
+var _a;
 var textBox = document.createElement("div");
-textBox.classList.add("textBox");
 document.body.appendChild(textBox);
-document.addEventListener("keydown", handleInput);
+textBox.classList.add("textBox");
+// get the number of lines that the displayed node takes up from local storage
+// use that number to determine how many lines the textbox should have
+var storedSize = (_a = localStorage.getItem("displayed-node-size")) !== null && _a !== void 0 ? _a : "300";
+var documentHeight = Math.max(300, parseInt(storedSize));
 var documentWidth = 100;
-var documentHeight = 150;
-newDocument(documentWidth, documentHeight);
+// fill the textbox with a grid of divs
+newDocument(textBox, documentWidth, documentHeight);
+var currentMode = "command";
+var documentNode = {
+    kind: "module",
+    contents: [],
+    numberOfRows: 0
+};
+var displayedNode = documentNode;
+var selectedNode = documentNode;
+document.addEventListener("keydown", handleInput);
+// clear the display of all text and highlighting
+function clearDisplay(documentHeight, documentWidth) {
+    for (var row = 0; row < documentHeight; row++) {
+        for (var x = 0; x < documentWidth; x++) {
+            setCharAt(row, x, " ");
+            unhighlightAt(row, x);
+        }
+    }
+}
+// this is the main entry point for the editor program
+function handleInput(e) {
+    e.preventDefault();
+    var key = e.key;
+    if (currentMode == "insert") {
+        insertMode(key);
+    }
+    if (currentMode == "command") {
+        commandMode(key);
+        console.log("command mode input sensed");
+    }
+}
+var commandMap = new Map();
+commandMap.set("f", addNewFunctionToModule);
+// make a table to handle input
+// mode, key, --> some function
+var insertMap = new Map();
+insertMap.set("Backspace", deleteSelection);
+insertMap.set("Tab", doNothing);
+insertMap.set("Control", doNothing);
+insertMap.set("Alt", doNothing);
+insertMap.set("Meta", doNothing);
+insertMap.set("ArrowUp", doNothing);
+insertMap.set("ArrowLeft", doNothing);
+insertMap.set("ArrowRight", doNothing);
+insertMap.set("ArrowDown", doNothing);
+insertMap.set("Space", insertSpace);
+insertMap.set("Enter", insertLineBreakBeforeSelection);
 var documentLastRow = 0;
-var currentMode = "insert";
+function printExpression(expr) {
+    if (expr.kind === "word") {
+        return printWord(expr);
+    }
+    if (expr.kind == "definition") {
+        return printDef(expr);
+    }
+    if (expr.kind == "module") {
+        return printModule(expr);
+    }
+}
+// print String to the ui directly
+function printString(str, row, x) {
+    for (var i = x; i < str.length + x; i++) {
+        setCharAt(row, i, str[i]);
+    }
+}
+// print module to ui directly
+function printModule(mod) {
+}
+// node --> print to ui at the location specified by node position attributes
+function printDef(def) {
+    var defKeyWord = "define ";
+    printString(defKeyWord, def.firstRow, 0);
+    printWord(def.name);
+    // To Do: print arguments and body of definition
+}
+// print word node onto ui
+function printWord(word) {
+    for (var i = 0; i < word.content.length; i++) {
+        printLetter(word.content[i]);
+    }
+}
+// print letter to ui
+function printLetter(letter) {
+    setCharAt(letter.row, letter.x, letter.value);
+}
 var currentSelection = {
     row: 0,
     start: 0,
@@ -131,27 +219,27 @@ function insertLineBreakBeforeSelection() {
     setSelection(newSelection);
     console.log(currentSelection);
 }
-function handleInput(e) {
-    e.preventDefault();
-    var key = e.key;
-    if (currentMode == "insert") {
-        insertMode(key);
-    }
-    if (currentMode == "command") {
-        commandMode(key);
-    }
-}
 function commandMode(key) {
     if (commandMap.has(key)) {
-        commandMap.get(key)();
+        return commandMap.get(key)();
     }
 }
+// handles user input when in insert mode
 function insertMode(key) {
+    // if key is not a letter or number, it should have an entry in the insertMap
     if (insertMap.has(key)) {
         insertMap.get(key)();
     }
     else {
-        insertBeforeSelection(key);
+        insertAtSelection(key);
+    }
+}
+function insertAtSelection(key) {
+}
+function put(newNode, currentNode, relativePosition) {
+    if (relativePosition === "last child") {
+        currentNode.content.push(newNode);
+        newNode.parent = currentNode;
     }
 }
 var lineEndIndices = new Map();
@@ -175,28 +263,94 @@ function insertBeforeSelection(key) {
 function doNothing() {
     return true;
 }
-// make a table to handle input
-// mode, key, --> some function
-var insertMap = new Map();
-insertMap.set("Backspace", deleteSelection);
-insertMap.set("Tab", doNothing);
-insertMap.set("Control", doNothing);
-insertMap.set("Alt", doNothing);
-insertMap.set("Meta", doNothing);
-insertMap.set("ArrowUp", doNothing);
-insertMap.set("ArrowLeft", doNothing);
-insertMap.set("ArrowRight", doNothing);
-insertMap.set("ArrowDown", doNothing);
-insertMap.set("Space", insertSpace);
-insertMap.set("Enter", insertLineBreakBeforeSelection);
 function insertSpace() {
     insertBeforeSelection(" ");
 }
 var shiftMap = new Map();
-var commandMap = new Map();
+// make a new blank node of type nodeType
+function makeNew(nodeType) {
+    if (nodeType == "word") {
+        return {
+            kind: "word",
+            content: [],
+            length: 0
+        };
+    }
+    else if (nodeType == "definition") {
+        return {
+            kind: "definition",
+            name: makeNew("word"),
+            arguments: [],
+            body: [],
+            numberOfRows: 1
+        };
+    }
+    else if (nodeType == "module") {
+        return {
+            kind: "module",
+            contents: [],
+            numberOfRows: 0
+        };
+    }
+}
+/*
+let newModule = empty module
+current selection = newModule
+current view = newModule
+mode = command
+ui is totally blank
+key = "f"
+
+let newDef = empty def
+ui = "define _" on first row (underscore indicates highlight), rest is blank
+mode = insert
+view = newModule
+selection = newDef.name
+
+module layout:
+module has a start row and end row
+when we add a def to a module, the def starts at (module.endRow + 2)
+module.endRow = module.endRow + 2 + def.numberOfRows
+*/
+// if selection is type module,
+// add a new blank function definition to the end of the current module
+// select the (blank) function name
+function addNewFunctionToModule() {
+    console.log("add new function");
+    if (selectedNode.kind == "module") {
+        // tree: add blank function def to end of module
+        var blankDef = makeNew("definition");
+        addDefToModule(blankDef, selectedNode);
+        currentMode = "insert";
+        selectedNode = blankDef.name;
+        // ui: add blank function def to end of module
+        printExpression(blankDef);
+    }
+}
+// only changes the tree, not the ui
+function addDefToModule(newDef, currentModule) {
+    currentModule.contents.push(newDef);
+    if (currentModule.numberOfRows == 0) {
+        newDef.firstRow = 0;
+        currentModule.numberOfRows = newDef.numberOfRows;
+    }
+    else {
+        newDef.firstRow = currentModule.numberOfRows + 2;
+        currentModule.numberOfRows = currentModule.numberOfRows + 1 + newDef.numberOfRows;
+    }
+}
+function makeBlankWord(row, start) {
+    var blankWord = {
+        kind: "word",
+        row: row,
+        start: start,
+        content: []
+    };
+    return blankWord;
+}
 // make a grid of divs with each one containing a space
 // appends the grid to textBox div
-function newDocument(width, height) {
+function newDocument(textBox, width, height) {
     for (var row = 0; row < height; row++) {
         var rowDiv = document.createElement("div");
         rowDiv.classList.add("row");
@@ -208,7 +362,6 @@ function newDocument(width, height) {
         }
         textBox.appendChild(rowDiv);
     }
-    highlightAt(0, 0);
 }
 // get char at (y,x) in grid
 function getCharAt(y, x) {
@@ -224,6 +377,9 @@ function getDivAt(y, x) {
 }
 // set char at (y,x) to newChar
 function setCharAt(y, x, newChar) {
+    console.log(y);
+    console.log(x);
+    console.log(newChar);
     var rows = textBox.childNodes;
     var rowChildren = rows[y].childNodes;
     rowChildren[x].textContent = newChar;

@@ -1,100 +1,178 @@
+// simple version of application:
+// user is working in a single file / module
+
+
 let textBox = document.createElement("div");
-textBox.classList.add("textBox");
 document.body.appendChild(textBox);
+textBox.classList.add("textBox");
+
+// get the number of lines that the displayed node takes up from local storage
+// use that number to determine how many lines the textbox should have
+let storedSize = localStorage.getItem("displayed-node-size") ?? "300";
+let documentHeight = Math.max(300, parseInt(storedSize));
+let documentWidth = 100;
+
+// fill the textbox with a grid of divs
+newDocument(textBox, documentWidth, documentHeight);
+
+let currentMode = "command";
+
+let documentNode : expression = {
+    kind: "module",
+    contents: [],
+    numberOfRows: 0
+};
+
+let displayedNode = documentNode;
+let selectedNode = documentNode;
+
 
 document.addEventListener("keydown", handleInput);
 
-let documentWidth = 100;
-let documentHeight = 150;
+// clear the display of all text and highlighting
+function clearDisplay(documentHeight, documentWidth) {
+    for (let row = 0; row < documentHeight; row ++) {
+        for (let x = 0; x < documentWidth; x ++) {
+            setCharAt(row, x, " ");
+            unhighlightAt(row, x);
+        }
+    }
 
-newDocument(documentWidth, documentHeight);
+}
+
+// this is the main entry point for the editor program
+function handleInput(e) {
+    e.preventDefault();
+    let key = e.key;
+    
+    if (currentMode == "insert") {
+        insertMode(key);
+    }
+    if (currentMode == "command") {
+        commandMode(key);
+    }
+}
+
+let commandMap = new Map();
+
+commandMap.set("f", addNewFunctionToModule);
+
+// make a table to handle input
+// mode, key, --> some function
+let insertMap = new Map();
+
+insertMap.set("Backspace", deleteSelection);
+insertMap.set("Tab", doNothing);
+insertMap.set("Control", doNothing);
+insertMap.set("Alt" , doNothing);
+insertMap.set("Meta", doNothing);
+insertMap.set("ArrowUp", doNothing);
+insertMap.set("ArrowLeft", doNothing);
+insertMap.set("ArrowRight", doNothing);
+insertMap.set("ArrowDown", doNothing);
+insertMap.set("Space", insertSpace);
+insertMap.set("Enter", insertLineBreakBeforeSelection);
+
 
 let documentLastRow = 0;
 
 type mode = "insert" | "command";
 
-type treeNode = {
-    letter?: string;
-    parent?: treeNode;
-    leftChild?: treeNode;
-    leftSibling?: treeNode;
-    rightSibling?: treeNode
+type state = {
+    selection: expression;
+    mode: mode;
 }
 
-let documentNode : treeNode = {};
-let selectedNode = documentNode;
-
-// inserts an empty node to the left of selected node
-// does not change the selection
-function insertEmptyNodeBeforeSelected() {
-    let blank : treeNode = {};
-    // need to do a lot of null checking
-    blank.rightSibling = selectedNode;
-    blank.leftSibling = selectedNode.leftSibling;
-    blank.parent = selectedNode.parent;
-
-    selectedNode.leftSibling = blank;
+type letter = {
+    value: string;
+    previous?: letter;
+    next?: letter,
+    parent?: word
+    row?: number,
+    x?: number
 }
 
-// inserts an empty node to the right of selected node
-// does not change the selection
-function insertEmptyNodeAfterSelected() {
-    let blank : treeNode = {};
-
-    blank.leftSibling = selectedNode;
-    blank.rightSibling = selectedNode.rightSibling;
-    blank.parent = selectedNode.parent;
-
-    selectedNode.rightSibling = blank;
+type word = {
+    kind: "word";
+    content: letter[];
+    parent?: expression;
+    row?: number;
+    start?: number;
+    length?: number;
 }
 
-function insertLetterInTree(letter) {
+type expression = word | application | definition | module;
+
+type application = {
+    kind: "application";
+    function: expression;
+    argument: expression;
+    row?: number;
+    start?: number;
+    end?: number;
+}
+
+type definition = {
+    kind: "definition";
+    name: word;
+    arguments: word[];
+    body: expression[];
+    firstRow?: number;
+    numberOfRows: number;
+    indent?: number;
+    parent: expression;
+}
+
+type module = {
+    kind: "module";
+    contents: definition[];
+    numberOfRows: number;
+}
+
+
+
+function printExpression(expr : expression) {
+    if (expr.kind === "word") {
+        return printWord(expr);
+    }
+    if (expr.kind == "definition") {
+        return printDef(expr);
+    }
+    if (expr.kind == "module") {
+        return printModule(expr);
+    }
+}
+
+// print String to the ui directly
+function printString(str : string, row : number, x: number) {
+    for (let i = x; i < str.length + x; i++) {
+        setCharAt(row, i, str[i]);
+    }
+}
+// print module to ui directly
+function printModule(mod : module) {
 
 }
-/*
-when user presses a key:
-  if we are in insert mode:
-    if the key is in the insert mode table:
-      perform the corresponding action
-    if the key is a letter:
-      we want to insert the letter in the right place in the ui relative to the selection
-      we want to insert the letter in the tree:
-        some different possiblities:
-          cursor is an empty node, and we are inserting the letter before/after it
-          cursor is a letter node, and we are inserting the letter before/after it
-        
-  if we are in command mode:
-    look the key up in the command table and do the corresponding action
+// node --> print to ui at the location specified by node position attributes
+function printDef(def : definition) {
+    let defKeyWord = "define ";
+    printString(defKeyWord, def.firstRow, 0);
+    printWord(def.name);
+    // To Do: print arguments and body of definition
+}
 
-tree actions (controlled by non-letter keys):
-  if the currently selected node is a list of letters, add new letter to the end
-  select right sibling node (if exists)
-  select left sibling node (if exists)
-  select parent node (if exists)
-  select first child node (if exists)
-  make a new empty node to the right of selected node
-  add a new empty node at the end of the children of current selection
+// print word node onto ui
+function printWord(word : word) {
+    for (let i = 0; i < word.content.length; i++) {
+        printLetter(word.content[i]);
+    }
+}
 
-we need some way of
-  getting left sibling of node
-  getting right sibling of node
-  getting parent of node
-  getting first child of node
-  adding empty node to left of node
-  adding empty node to right
-  adding letter to end of word node
-  adding new empty node to children
+// print letter to ui
+function printLetter(letter : letter) {
+    setCharAt(letter.row, letter.x, letter.value);
+}
 
-typing a letter adds the letter to current word
-typing space starts a new empty list to the right of current and selects it
-typing leftParens: if current list is empty, add an empty list inside it, and select that
-typing rightParens selects the parent node
-
-For testing purposes, it would be nice to have a way to uniformly
-display trees in the ui, aka a print function for expressions
-
-(a b c (d e f))
-*/
 
 // an interval is a contiguous range of positions on a single line
 // when an interval is selected,
@@ -116,12 +194,11 @@ type Block = {
     lastRow: number;
 }
 
-let currentMode : mode = "insert";
-let currentSelection : Interval = {
-    row : 0,
+let currentSelection = {
+    row: 0,
     start: 0,
     end: 0
-};
+}
 
 function shiftBlockDown(section : Block, shift : number) {
     for (let i = section.lastRow; i >= section.firstRow; i--) {
@@ -202,7 +279,6 @@ function setSelection(newRange : Interval) {
     currentSelection = newRange;
 
     highlightInterval(newRange);
-
 }
 
 function shiftText(range : Interval, shift) {
@@ -273,37 +349,36 @@ function insertLineBreakBeforeSelection() {
     }
 
     setSelection(newSelection);
-    console.log(currentSelection);
 
-}
-
-
-function handleInput(e) {
-    e.preventDefault();
-    let key = e.key;
-
-    if (currentMode == "insert") {
-        insertMode(key);
-    }
-    if (currentMode == "command") {
-        commandMode(key);
-    }
 }
 
 function commandMode(key) {
     if (commandMap.has(key)) {
-        commandMap.get(key)();
+        return commandMap.get(key)();
     }
     
 }
 
+// handles user input when in insert mode
 function insertMode(key) {
+    // if key is not a letter or number, it should have an entry in the insertMap
     if (insertMap.has(key)) {
         insertMap.get(key)();
     }
     else {
-        insertBeforeSelection(key);
-        currentList.push(key);
+        insertAtSelection(key);
+    }
+}
+
+function insertAtSelection(key) {
+
+}
+
+function put(newNode, currentNode, relativePosition) {
+    if (relativePosition === "last child") {
+        currentNode.content.push(newNode);
+        newNode.parent = currentNode;
+        
     }
 }
 
@@ -337,23 +412,6 @@ function doNothing() {
     return true;
 }
 
-
-// make a table to handle input
-// mode, key, --> some function
-let insertMap = new Map();
-
-insertMap.set("Backspace", deleteSelection);
-insertMap.set("Tab", doNothing);
-insertMap.set("Control", doNothing);
-insertMap.set("Alt" , doNothing);
-insertMap.set("Meta", doNothing);
-insertMap.set("ArrowUp", doNothing);
-insertMap.set("ArrowLeft", doNothing);
-insertMap.set("ArrowRight", doNothing);
-insertMap.set("ArrowDown", doNothing);
-insertMap.set("Space", insertSpace);
-insertMap.set("Enter", insertLineBreakBeforeSelection);
-
 function insertSpace() {
     insertBeforeSelection(" ");
 
@@ -362,12 +420,100 @@ function insertSpace() {
 let shiftMap = new Map();
 
 
-let commandMap = new Map();
+// make a new blank node of type nodeType
+function makeNew(nodeType) {
+    if (nodeType == "word") {
+        return {
+            kind: "word",
+            content: [],
+            length: 0
+        }
+    }
+    else if (nodeType == "definition") {
+        return {
+            kind: "definition",
+            name: makeNew("word"),
+            arguments: [],
+            body: [],
+            numberOfRows: 1
+        }
+    }
+    else if (nodeType == "module") {
+        return {
+            kind: "module",
+            contents: [],
+            numberOfRows: 0
+        }
+    }
+}
+
+/*
+let newModule = empty module
+current selection = newModule
+current view = newModule
+mode = command
+ui is totally blank
+key = "f"
+
+let newDef = empty def
+ui = "define _" on first row (underscore indicates highlight), rest is blank
+mode = insert
+view = newModule
+selection = newDef.name
+
+module layout:
+module has a start row and end row
+when we add a def to a module, the def starts at (module.endRow + 2)
+module.endRow = module.endRow + 2 + def.numberOfRows
+*/
+
+// if selection is type module,
+// add a new blank function definition to the end of the current module
+// select the (blank) function name
+function addNewFunctionToModule() {
+    if (selectedNode.kind == "module") {
+        // tree: add blank function def to end of module
+        let blankDef = makeNew("definition");
+        addDefToModule(blankDef, selectedNode);
+
+        currentMode = "insert";
+        selectedNode = blankDef.name;
+
+        // ui: add blank function def to end of module
+        printExpression(blankDef);
+    }
+    
+}
+
+// only changes the tree, not the ui
+function addDefToModule(newDef : definition, currentModule : module) {
+    currentModule.contents.push(newDef);
+
+    if (currentModule.numberOfRows == 0) {
+        newDef.firstRow = 0;
+        currentModule.numberOfRows = newDef.numberOfRows;
+    }
+    else {
+        newDef.firstRow = currentModule.numberOfRows + 2;
+        currentModule.numberOfRows = currentModule.numberOfRows + 1 + newDef.numberOfRows;
+    }
+}
+
+function makeBlankWord(row, start) : word {
+    let blankWord : word = {
+        kind: "word",
+        row: row,
+        start: start,
+        content: []
+    }
+    return blankWord
+
+}
 
 
 // make a grid of divs with each one containing a space
 // appends the grid to textBox div
-function newDocument(width, height) {
+function newDocument(textBox, width, height) {
     for (let row = 0; row < height; row ++) {
         let rowDiv = document.createElement("div");
         rowDiv.classList.add("row");
@@ -380,11 +526,10 @@ function newDocument(width, height) {
         }
         textBox.appendChild(rowDiv);
     }
-    highlightAt(0,0);
 }
 
 // get char at (y,x) in grid
-function getCharAt(y : number, x : number) : string {
+function getCharAt(y : number, x : number) {
     let rows = textBox.childNodes;
     let rowChildren = rows[y].childNodes;
     return rowChildren[x].textContent;
