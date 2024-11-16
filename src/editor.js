@@ -1,9 +1,21 @@
 // simple version of application:
 // user is working in a single file / module
 var _a;
+// TODO: add assertion that
+// printing the current tree to the ui should match the current ui
+// for testing purposes, make a ui that is a nested array grid
+// TODO: for each document state, there is a different table of commands
+// we want to make that table visible in the ui
+var container = document.createElement("div");
+document.body.appendChild(container);
+container.classList.add("container");
 var textBox = document.createElement("div");
-document.body.appendChild(textBox);
+container.appendChild(textBox);
 textBox.classList.add("textBox");
+var commandTable = document.createElement("div");
+container.appendChild(commandTable);
+commandTable.classList.add("commandTable");
+commandTable.textContent = "Commands";
 // get the number of lines that the displayed node takes up from local storage
 // use that number to determine how many lines the textbox should have
 var storedSize = (_a = localStorage.getItem("displayed-node-size")) !== null && _a !== void 0 ? _a : "300";
@@ -38,7 +50,6 @@ function handleInput(e) {
     }
     if (currentMode == "command") {
         commandMode(key);
-        console.log("command mode input sensed");
     }
 }
 var commandMap = new Map();
@@ -46,7 +57,7 @@ commandMap.set("f", addNewFunctionToModule);
 // make a table to handle input
 // mode, key, --> some function
 var insertMap = new Map();
-insertMap.set("Backspace", deleteSelection);
+insertMap.set("Backspace", doNothing);
 insertMap.set("Tab", doNothing);
 insertMap.set("Control", doNothing);
 insertMap.set("Alt", doNothing);
@@ -55,8 +66,8 @@ insertMap.set("ArrowUp", doNothing);
 insertMap.set("ArrowLeft", doNothing);
 insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
-insertMap.set("Space", insertSpace);
-insertMap.set("Enter", insertLineBreakBeforeSelection);
+insertMap.set("Space", doNothing);
+insertMap.set("Enter", doNothing);
 var documentLastRow = 0;
 function printExpression(expr) {
     if (expr.kind === "word") {
@@ -146,47 +157,41 @@ function moveText(range, newRow, newStart) {
     setIntervalText(range, " ");
     copyArrayToPosition(textArray, newRow, newStart);
 }
-function unhighlightInterval(range) {
-    for (var i = range.start; i <= range.end; i++) {
-        unhighlightAt(range.row, i);
+function unhighlightNode(node) {
+    // either node is a block of multiple whole lines
+    // or node is a portion of a single line
+    // for now, we assume there is only one module
+    // that module, or one of its functions, is what is displayed
+    // if the whole module is selected, the whole textbox will be highlighted
+    // so to unselect it, we need to remove the highlighting
+    if (node.kind == "module") {
+        for (var i = 0; i < node.numberOfRows; i++) {
+            unhighlightRange(i, 0, documentWidth);
+        }
+    }
+    if (node.kind == "word") {
+        unhighlightRange(node.row, node.start, node.start + node.length);
+    }
+    if (node.kind == "definition") {
     }
 }
-function highlightInterval(range) {
-    for (var i = range.start; i <= range.end; i++) {
-        highlightAt(range.row, i);
+function unhighlightRange(rowNumber, start, end) {
+    for (var k = start; k < end; k++) {
+        unhighlightAt(rowNumber, k);
     }
+}
+function highlightNode(node) {
 }
 // updates currentSelection variable
 // updates highlighting
 // does not move any text
-function setSelection(newRange) {
-    unhighlightInterval(currentSelection);
-    currentSelection = newRange;
-    highlightInterval(newRange);
+function setSelection(newSelection) {
+    unhighlightNode(selectedNode);
+    selectedNode = newSelection;
+    highlightNode(newSelection);
 }
 function shiftText(range, shift) {
     moveText(range, range.row, range.start + shift);
-}
-function deleteSelection() {
-    var currentRow = currentSelection.row;
-    var currentStart = currentSelection.start;
-    var currentEnd = currentSelection.end;
-    var selectionLength = currentEnd - currentStart + 1;
-    var endOfLine = lineEndIndices.get(currentRow);
-    var newCursor = {
-        start: currentStart - 1,
-        end: currentStart - 1,
-        row: currentRow
-    };
-    var afterSelection = {
-        row: currentRow,
-        start: currentSelection.end + 1,
-        end: endOfLine
-    };
-    setIntervalText(currentSelection, " ");
-    shiftText(afterSelection, -selectionLength);
-    setSelection(newCursor);
-    lineEndIndices.set(currentRow, endOfLine - selectionLength);
 }
 function insertBlankLineBelow() {
     var row = currentSelection.row;
@@ -199,25 +204,6 @@ function insertBlankLineBelow() {
         shiftBlockDown(everythingBelow, 1);
     }
     documentLastRow = documentLastRow + 1;
-}
-function insertLineBreakBeforeSelection() {
-    // shift everything below current line down by 1
-    insertBlankLineBelow();
-    // move selection text and rest of line to line below
-    var restOfLine = {
-        row: currentSelection.row,
-        start: currentSelection.start,
-        end: lineEndIndices.get(currentSelection.row)
-    };
-    moveText(restOfLine, currentSelection.row + 1, 0);
-    // move selection (highlighting + variable) to start of new line
-    var newSelection = {
-        row: currentSelection.row + 1,
-        start: 0,
-        end: currentSelection.end - currentSelection.start
-    };
-    setSelection(newSelection);
-    console.log(currentSelection);
 }
 function commandMode(key) {
     if (commandMap.has(key)) {
@@ -244,27 +230,8 @@ function put(newNode, currentNode, relativePosition) {
 }
 var lineEndIndices = new Map();
 lineEndIndices.set(0, 0);
-function insertBeforeSelection(key) {
-    var currentRow = currentSelection.row;
-    var endOfLine = lineEndIndices.get(currentRow);
-    var afterSelection = {
-        row: currentRow,
-        start: currentSelection.end + 1,
-        end: endOfLine
-    };
-    // shift everything after the selection to the right by 1
-    shiftText(afterSelection, 1);
-    // shift selection to the right by 1
-    setSelection(shiftIntervalRight(currentSelection, 1));
-    // insert key right before the start of new selection
-    setCharAt(currentRow, currentSelection.start - 1, key);
-    lineEndIndices.set(currentRow, endOfLine + 1);
-}
 function doNothing() {
     return true;
-}
-function insertSpace() {
-    insertBeforeSelection(" ");
 }
 var shiftMap = new Map();
 // make a new blank node of type nodeType
@@ -293,30 +260,10 @@ function makeNew(nodeType) {
         };
     }
 }
-/*
-let newModule = empty module
-current selection = newModule
-current view = newModule
-mode = command
-ui is totally blank
-key = "f"
-
-let newDef = empty def
-ui = "define _" on first row (underscore indicates highlight), rest is blank
-mode = insert
-view = newModule
-selection = newDef.name
-
-module layout:
-module has a start row and end row
-when we add a def to a module, the def starts at (module.endRow + 2)
-module.endRow = module.endRow + 2 + def.numberOfRows
-*/
 // if selection is type module,
 // add a new blank function definition to the end of the current module
 // select the (blank) function name
 function addNewFunctionToModule() {
-    console.log("add new function");
     if (selectedNode.kind == "module") {
         // tree: add blank function def to end of module
         var blankDef = makeNew("definition");
@@ -325,6 +272,8 @@ function addNewFunctionToModule() {
         selectedNode = blankDef.name;
         // ui: add blank function def to end of module
         printExpression(blankDef);
+        // tree: change the selection to function name node
+        selectedNode = blankDef.name;
     }
 }
 // only changes the tree, not the ui
@@ -377,9 +326,6 @@ function getDivAt(y, x) {
 }
 // set char at (y,x) to newChar
 function setCharAt(y, x, newChar) {
-    console.log(y);
-    console.log(x);
-    console.log(newChar);
     var rows = textBox.childNodes;
     var rowChildren = rows[y].childNodes;
     rowChildren[x].textContent = newChar;

@@ -1,10 +1,47 @@
 // simple version of application:
 // user is working in a single file / module
 
+// TODO: add assertion that
+// printing the current tree to the ui should match the current ui
+// for testing purposes, make a ui that is a nested array grid
+
+// TODO: for each document state, there is a different table of commands
+// we want to make that table visible in the ui
+
+// figure out what kind of position and size info is stored by different nodes
+// possible views:
+// -single file: list of function definitions
+// -single function def: list of statements
+
+// single file view: the entire syntax tree is displayed
+// so it makes sense for every node to have position info
+// sufficient to store position info relative to the current function
+
+// def node stores the function starting line:
+// the number of lines the function takes up can be calculated
+
+// word node stores its start index, length can be calculated,
+// row number can be calculated from parent
+
+// application node stores its row number relative to the enclosing def
+// assume application takes up at most 1 line
+
+
+
+
+
+let container = document.createElement("div");
+document.body.appendChild(container);
+container.classList.add("container");
 
 let textBox = document.createElement("div");
-document.body.appendChild(textBox);
+container.appendChild(textBox);
 textBox.classList.add("textBox");
+
+let commandTable = document.createElement("div");
+container.appendChild(commandTable);
+commandTable.classList.add("commandTable");
+commandTable.textContent = "Commands";
 
 // get the number of lines that the displayed node takes up from local storage
 // use that number to determine how many lines the textbox should have
@@ -24,7 +61,7 @@ let documentNode : expression = {
 };
 
 let displayedNode = documentNode;
-let selectedNode = documentNode;
+let selectedNode : expression = documentNode;
 
 
 document.addEventListener("keydown", handleInput);
@@ -61,7 +98,7 @@ commandMap.set("f", addNewFunctionToModule);
 // mode, key, --> some function
 let insertMap = new Map();
 
-insertMap.set("Backspace", deleteSelection);
+insertMap.set("Backspace", doNothing);
 insertMap.set("Tab", doNothing);
 insertMap.set("Control", doNothing);
 insertMap.set("Alt" , doNothing);
@@ -70,8 +107,8 @@ insertMap.set("ArrowUp", doNothing);
 insertMap.set("ArrowLeft", doNothing);
 insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
-insertMap.set("Space", insertSpace);
-insertMap.set("Enter", insertLineBreakBeforeSelection);
+insertMap.set("Space", doNothing);
+insertMap.set("Enter", doNothing);
 
 
 let documentLastRow = 0;
@@ -95,21 +132,20 @@ type letter = {
 type word = {
     kind: "word";
     content: letter[];
-    parent?: expression;
+    parent: expression;
     row?: number;
     start?: number;
-    length?: number;
 }
 
 type expression = word | application | definition | module;
 
+// the statements of the program are applications
 type application = {
     kind: "application";
-    function: expression;
-    argument: expression;
-    row?: number;
-    start?: number;
-    end?: number;
+    row: number;
+    parent: expression;
+    operator: expression;
+    arguments: expression[];
 }
 
 type definition = {
@@ -118,8 +154,6 @@ type definition = {
     arguments: word[];
     body: expression[];
     firstRow?: number;
-    numberOfRows: number;
-    indent?: number;
     parent: expression;
 }
 
@@ -259,59 +293,28 @@ function moveText(range : Interval, newRow, newStart) {
     copyArrayToPosition(textArray, newRow, newStart);
 }
 
-function unhighlightInterval(range : Interval) {
-    for (let i = range.start; i <= range.end; i ++) {
-        unhighlightAt(range.row, i);
-    }
+// unhighlight the portion of the ui that node takes up
+function unhighlightNode(node : expression) {
+    mapActionOverNode(unhighlightAt, node);
 }
 
-function highlightInterval(range : Interval) {
-    for (let i = range.start; i <= range.end; i++) {
-        highlightAt(range.row, i);
-    }
+// highlight the portion of the ui that node takes up
+function highlightNode(node : expression) {
+    mapActionOverNode(highlightAt, node);
 }
 
-// updates currentSelection variable
-// updates highlighting
-// does not move any text
-function setSelection(newRange : Interval) {
-    unhighlightInterval(currentSelection);
-    currentSelection = newRange;
+// set selectedNode = newSelection
+// unhighlight the selected portion of ui
+// highlight the new selected node
+function setSelection(newSelection : expression) {
+    unhighlightNode(selectedNode);
+    selectedNode = newSelection;
 
-    highlightInterval(newRange);
+    highlightNode(newSelection);
 }
 
 function shiftText(range : Interval, shift) {
     moveText(range, range.row, range.start + shift);
-}
-
-function deleteSelection() {
-    let currentRow = currentSelection.row;
-    let currentStart = currentSelection.start;
-    let currentEnd = currentSelection.end;
-    let selectionLength = currentEnd - currentStart + 1;
-
-    let endOfLine = lineEndIndices.get(currentRow);
-
-    let newCursor : Interval = {
-        start: currentStart - 1,
-        end: currentStart - 1,
-        row: currentRow
-    }
-
-    let afterSelection : Interval = {
-        row: currentRow,
-        start: currentSelection.end + 1,
-        end: endOfLine
-    }
-
-    setIntervalText(currentSelection, " ");
-    shiftText(afterSelection, - selectionLength);
-
-    setSelection(newCursor);
-
-    lineEndIndices.set(currentRow, endOfLine - selectionLength);
-    
 }
 
 function insertBlankLineBelow() {
@@ -329,28 +332,6 @@ function insertBlankLineBelow() {
 
 }
 
-function insertLineBreakBeforeSelection() {
-    // shift everything below current line down by 1
-    insertBlankLineBelow();
-    // move selection text and rest of line to line below
-    let restOfLine : Interval = {
-        row: currentSelection.row,
-        start: currentSelection.start,
-        end: lineEndIndices.get(currentSelection.row)
-    }
-
-    moveText(restOfLine, currentSelection.row + 1, 0);
-
-    // move selection (highlighting + variable) to start of new line
-    let newSelection : Interval = {
-        row: currentSelection.row + 1,
-        start: 0,
-        end: currentSelection.end - currentSelection.start
-    }
-
-    setSelection(newSelection);
-
-}
 
 function commandMode(key) {
     if (commandMap.has(key)) {
@@ -385,37 +366,10 @@ function put(newNode, currentNode, relativePosition) {
 let lineEndIndices = new Map();
 lineEndIndices.set(0,0);
 
-function insertBeforeSelection(key) {
-    let currentRow = currentSelection.row;
-    let endOfLine = lineEndIndices.get(currentRow);
-
-    let afterSelection : Interval = {
-        row: currentRow,
-        start: currentSelection.end + 1,
-        end: endOfLine
-    }
-
-    // shift everything after the selection to the right by 1
-    shiftText(afterSelection, 1);
-
-    // shift selection to the right by 1
-    setSelection(shiftIntervalRight(currentSelection, 1));
-
-    // insert key right before the start of new selection
-    setCharAt(currentRow, currentSelection.start - 1, key);
-
-    lineEndIndices.set(currentRow, endOfLine + 1);
-}
-
-
 function doNothing() {
     return true;
 }
 
-function insertSpace() {
-    insertBeforeSelection(" ");
-
-}
 
 let shiftMap = new Map();
 
@@ -447,26 +401,6 @@ function makeNew(nodeType) {
     }
 }
 
-/*
-let newModule = empty module
-current selection = newModule
-current view = newModule
-mode = command
-ui is totally blank
-key = "f"
-
-let newDef = empty def
-ui = "define _" on first row (underscore indicates highlight), rest is blank
-mode = insert
-view = newModule
-selection = newDef.name
-
-module layout:
-module has a start row and end row
-when we add a def to a module, the def starts at (module.endRow + 2)
-module.endRow = module.endRow + 2 + def.numberOfRows
-*/
-
 // if selection is type module,
 // add a new blank function definition to the end of the current module
 // select the (blank) function name
@@ -481,6 +415,12 @@ function addNewFunctionToModule() {
 
         // ui: add blank function def to end of module
         printExpression(blankDef);
+
+        // tree and ui: change the selection to new function name
+        // visible result: "define _" where the underscore is selected
+        setSelection(blankDef.name);
+
+
     }
     
 }
@@ -497,17 +437,6 @@ function addDefToModule(newDef : definition, currentModule : module) {
         newDef.firstRow = currentModule.numberOfRows + 2;
         currentModule.numberOfRows = currentModule.numberOfRows + 1 + newDef.numberOfRows;
     }
-}
-
-function makeBlankWord(row, start) : word {
-    let blankWord : word = {
-        kind: "word",
-        row: row,
-        start: start,
-        content: []
-    }
-    return blankWord
-
 }
 
 
@@ -613,4 +542,19 @@ function highlightAt(row, x) {
 function unhighlightAt(row, x) {
     let position = getDivAt(row, x);
     position.removeAttribute("id");
+}
+
+// takes in a function (row, x) --> perform some action
+// apply it to all the positions occupied by a node
+// TODO: implement for all types of expressions
+// alternate implementation idea: action: div -> div  (pure function)
+// for each position div in the node, set letterDiv = action letterDiv
+function mapActionOverNode(action, node) {
+    if (node.kind == "word") {
+        let row = node.row;
+        let end = node.start + node.length;
+        for (let i = node.start; i < end; i++) {
+            action(row, i);
+        }
+    }
 }
