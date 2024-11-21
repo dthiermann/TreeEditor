@@ -13,9 +13,7 @@
 // -single file: list of function definitions
 // -single function def: list of statements
 
-// single file view: the entire syntax tree is displayed
-// so it makes sense for every node to have position info
-// sufficient to store position info relative to the current function
+// single file view: 
 
 // def node stores the function starting line:
 // the number of lines the function takes up can be calculated
@@ -26,7 +24,28 @@
 // application node stores its row number relative to the enclosing def
 // assume application takes up at most 1 line
 
+// each node can store all of its data, but then it has to update all of its data on each
+// change to the tree
 
+// or some data doesn't have to be stored but can be recalculated
+
+// define _
+// make a first " " child node of name
+// set the selection to that child node
+// then the rule for inserting is that the selected node
+// is replaced by the key
+
+// could have functions take in and return
+// mode
+// selectednode
+
+// latest thought
+
+// position info should only be stored when a node is actually displayed
+// whenever the view changes, 
+
+// user will only ever be editing a displayed node
+// so whatever edit is being made 
 
 
 
@@ -53,6 +72,7 @@ let documentWidth = 100;
 newDocument(textBox, documentWidth, documentHeight);
 
 let currentMode = "command";
+let defKeyWord = "define ";
 
 let documentNode : expression = {
     kind: "module",
@@ -115,31 +135,26 @@ let documentLastRow = 0;
 
 type mode = "insert" | "command";
 
-type state = {
-    selection: expression;
-    mode: mode;
-}
-
 type letter = {
+    kind: "letter";
     value: string;
-    previous?: letter;
-    next?: letter,
-    parent?: word
-    row?: number,
-    x?: number
+    parent: word
+    x: number
 }
 
+// row should be relative to parent definition
 type word = {
     kind: "word";
-    content: letter[];
-    parent: expression;
-    row?: number;
-    start?: number;
+    content?: letter[];
+    parent?: expression;
+    row: number;
+    start: number;
 }
 
-type expression = word | application | definition | module;
+type expression = letter | word | application | definition | module;
 
 // the statements of the program are applications
+// row is relative to parent definition
 type application = {
     kind: "application";
     row: number;
@@ -148,13 +163,15 @@ type application = {
     arguments: expression[];
 }
 
+// firstRow is relative to parent module/file
 type definition = {
     kind: "definition";
-    name: word;
-    arguments: word[];
-    body: expression[];
-    firstRow?: number;
-    parent: expression;
+    name?: word;
+    arguments?: word[];
+    body?: expression[];
+    firstRow: number;
+    parent?: expression;
+    numberOfRows: number;
 }
 
 type module = {
@@ -189,7 +206,6 @@ function printModule(mod : module) {
 }
 // node --> print to ui at the location specified by node position attributes
 function printDef(def : definition) {
-    let defKeyWord = "define ";
     printString(defKeyWord, def.firstRow, 0);
     printWord(def.name);
     // To Do: print arguments and body of definition
@@ -204,7 +220,8 @@ function printWord(word : word) {
 
 // print letter to ui
 function printLetter(letter : letter) {
-    setCharAt(letter.row, letter.x, letter.value);
+    let row = letter.parent.row;
+    setCharAt(row, letter.x, letter.value);
 }
 
 
@@ -375,60 +392,79 @@ let shiftMap = new Map();
 
 
 // make a new blank node of type nodeType
-function makeNew(nodeType) {
+function makeNew(nodeType) : expression {
     if (nodeType == "word") {
-        return {
-            kind: "word",
-            content: [],
-            length: 0
-        }
+        return makeNewWord();
     }
     else if (nodeType == "definition") {
-        return {
-            kind: "definition",
-            name: makeNew("word"),
-            arguments: [],
-            body: [],
-            numberOfRows: 1
-        }
-    }
-    else if (nodeType == "module") {
-        return {
-            kind: "module",
-            contents: [],
-            numberOfRows: 0
-        }
+        return makeNewDef();
     }
 }
 
+function makeNewDef() : definition {
+    let newNode : definition = 
+        {
+            kind: "definition",
+            firstRow: 0,
+            arguments: [],
+            body: [],
+            numberOfRows: 1,
+            name: makeNewWord()
+        }
+        return newNode;
+}
+
+function makeNewWord() : word {
+    let newWord : word = {
+        kind: "word",
+        content: [],
+        row: 0,
+        start: 0
+    }
+    return newWord;
+
+}
+
+
 // if selection is type module,
-// add a new blank function definition to the end of the current module
-// select the (blank) function name
+// add function to module
+// display only that function
+// change mode to insert
+// select blank function name so user can start typing the name
 function addNewFunctionToModule() {
     if (selectedNode.kind == "module") {
-        // tree: add blank function def to end of module
-        let blankDef = makeNew("definition");
+        // tree: add blank function def to  module
+        let blankDef : definition = makeNewDef();
         addDefToModule(blankDef, selectedNode);
 
-        currentMode = "insert";
-        selectedNode = blankDef.name;
-
-        // ui: add blank function def to end of module
+        // ui: display the def
         printExpression(blankDef);
 
-        // tree and ui: change the selection to new function name
-        // visible result: "define _" where the underscore is selected
-        setSelection(blankDef.name);
+        currentMode = "insert";
 
+        // add a " " node as the first letter of name
+        blankDef.name.content[0] = {
+            kind: "letter",
+            parent: blankDef.name,
+            x: defKeyWord.length,
+            value: " "
+        }
+
+        // tree and ui: change the selection to this " " node
+        // visible result: "define _" where the underscore is selected
+        setSelection(blankDef.name.content[0]);
 
     }
     
 }
 
-// only changes the tree, not the ui
+// make the provided def be the last child of the module
 function addDefToModule(newDef : definition, currentModule : module) {
+    // set child and parent references correctly
     currentModule.contents.push(newDef);
+    newDef.parent = currentModule;
 
+    // 
     if (currentModule.numberOfRows == 0) {
         newDef.firstRow = 0;
         currentModule.numberOfRows = newDef.numberOfRows;
@@ -549,12 +585,18 @@ function unhighlightAt(row, x) {
 // TODO: implement for all types of expressions
 // alternate implementation idea: action: div -> div  (pure function)
 // for each position div in the node, set letterDiv = action letterDiv
-function mapActionOverNode(action, node) {
+function mapActionOverNode(action, node : expression) {
     if (node.kind == "word") {
         let row = node.row;
-        let end = node.start + node.length;
+        let end = node.start + node.content.length;
         for (let i = node.start; i < end; i++) {
             action(row, i);
         }
+    }
+    if (node.kind == "letter") {
+        let row = node.parent.row;
+        console.log("row: ", row);
+        console.log("x: ", node.x);
+        action(row, node.x);
     }
 }

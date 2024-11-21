@@ -6,6 +6,33 @@ var _a;
 // for testing purposes, make a ui that is a nested array grid
 // TODO: for each document state, there is a different table of commands
 // we want to make that table visible in the ui
+// figure out what kind of position and size info is stored by different nodes
+// possible views:
+// -single file: list of function definitions
+// -single function def: list of statements
+// single file view: 
+// def node stores the function starting line:
+// the number of lines the function takes up can be calculated
+// word node stores its start index, length can be calculated,
+// row number can be calculated from parent
+// application node stores its row number relative to the enclosing def
+// assume application takes up at most 1 line
+// each node can store all of its data, but then it has to update all of its data on each
+// change to the tree
+// or some data doesn't have to be stored but can be recalculated
+// define _
+// make a first " " child node of name
+// set the selection to that child node
+// then the rule for inserting is that the selected node
+// is replaced by the key
+// could have functions take in and return
+// mode
+// selectednode
+// latest thought
+// position info should only be stored when a node is actually displayed
+// whenever the view changes, 
+// user will only ever be editing a displayed node
+// so whatever edit is being made 
 var container = document.createElement("div");
 document.body.appendChild(container);
 container.classList.add("container");
@@ -24,6 +51,7 @@ var documentWidth = 100;
 // fill the textbox with a grid of divs
 newDocument(textBox, documentWidth, documentHeight);
 var currentMode = "command";
+var defKeyWord = "define ";
 var documentNode = {
     kind: "module",
     contents: [],
@@ -91,7 +119,6 @@ function printModule(mod) {
 }
 // node --> print to ui at the location specified by node position attributes
 function printDef(def) {
-    var defKeyWord = "define ";
     printString(defKeyWord, def.firstRow, 0);
     printWord(def.name);
     // To Do: print arguments and body of definition
@@ -104,7 +131,8 @@ function printWord(word) {
 }
 // print letter to ui
 function printLetter(letter) {
-    setCharAt(letter.row, letter.x, letter.value);
+    var row = letter.parent.row;
+    setCharAt(row, letter.x, letter.value);
 }
 var currentSelection = {
     row: 0,
@@ -157,34 +185,17 @@ function moveText(range, newRow, newStart) {
     setIntervalText(range, " ");
     copyArrayToPosition(textArray, newRow, newStart);
 }
+// unhighlight the portion of the ui that node takes up
 function unhighlightNode(node) {
-    // either node is a block of multiple whole lines
-    // or node is a portion of a single line
-    // for now, we assume there is only one module
-    // that module, or one of its functions, is what is displayed
-    // if the whole module is selected, the whole textbox will be highlighted
-    // so to unselect it, we need to remove the highlighting
-    if (node.kind == "module") {
-        for (var i = 0; i < node.numberOfRows; i++) {
-            unhighlightRange(i, 0, documentWidth);
-        }
-    }
-    if (node.kind == "word") {
-        unhighlightRange(node.row, node.start, node.start + node.length);
-    }
-    if (node.kind == "definition") {
-    }
+    mapActionOverNode(unhighlightAt, node);
 }
-function unhighlightRange(rowNumber, start, end) {
-    for (var k = start; k < end; k++) {
-        unhighlightAt(rowNumber, k);
-    }
-}
+// highlight the portion of the ui that node takes up
 function highlightNode(node) {
+    mapActionOverNode(highlightAt, node);
 }
-// updates currentSelection variable
-// updates highlighting
-// does not move any text
+// set selectedNode = newSelection
+// unhighlight the selected portion of ui
+// highlight the new selected node
 function setSelection(newSelection) {
     unhighlightNode(selectedNode);
     selectedNode = newSelection;
@@ -237,48 +248,63 @@ var shiftMap = new Map();
 // make a new blank node of type nodeType
 function makeNew(nodeType) {
     if (nodeType == "word") {
-        return {
-            kind: "word",
-            content: [],
-            length: 0
-        };
+        return makeNewWord();
     }
     else if (nodeType == "definition") {
-        return {
-            kind: "definition",
-            name: makeNew("word"),
-            arguments: [],
-            body: [],
-            numberOfRows: 1
-        };
+        return makeNewDef();
     }
-    else if (nodeType == "module") {
-        return {
-            kind: "module",
-            contents: [],
-            numberOfRows: 0
-        };
-    }
+}
+function makeNewDef() {
+    var newNode = {
+        kind: "definition",
+        firstRow: 0,
+        arguments: [],
+        body: [],
+        numberOfRows: 1,
+        name: makeNewWord()
+    };
+    return newNode;
+}
+function makeNewWord() {
+    var newWord = {
+        kind: "word",
+        content: [],
+        row: 0,
+        start: 0
+    };
+    return newWord;
 }
 // if selection is type module,
-// add a new blank function definition to the end of the current module
-// select the (blank) function name
+// add function to module
+// display only that function
+// change mode to insert
+// select blank function name so user can start typing the name
 function addNewFunctionToModule() {
     if (selectedNode.kind == "module") {
-        // tree: add blank function def to end of module
-        var blankDef = makeNew("definition");
+        // tree: add blank function def to  module
+        var blankDef = makeNewDef();
         addDefToModule(blankDef, selectedNode);
-        currentMode = "insert";
-        selectedNode = blankDef.name;
-        // ui: add blank function def to end of module
+        // ui: display the def
         printExpression(blankDef);
-        // tree: change the selection to function name node
-        selectedNode = blankDef.name;
+        currentMode = "insert";
+        // add a " " node as the first letter of name
+        blankDef.name.content[0] = {
+            kind: "letter",
+            parent: blankDef.name,
+            x: defKeyWord.length,
+            value: " "
+        };
+        // tree and ui: change the selection to this " " node
+        // visible result: "define _" where the underscore is selected
+        setSelection(blankDef.name.content[0]);
     }
 }
-// only changes the tree, not the ui
+// make the provided def be the last child of the module
 function addDefToModule(newDef, currentModule) {
+    // set child and parent references correctly
     currentModule.contents.push(newDef);
+    newDef.parent = currentModule;
+    // 
     if (currentModule.numberOfRows == 0) {
         newDef.firstRow = 0;
         currentModule.numberOfRows = newDef.numberOfRows;
@@ -287,15 +313,6 @@ function addDefToModule(newDef, currentModule) {
         newDef.firstRow = currentModule.numberOfRows + 2;
         currentModule.numberOfRows = currentModule.numberOfRows + 1 + newDef.numberOfRows;
     }
-}
-function makeBlankWord(row, start) {
-    var blankWord = {
-        kind: "word",
-        row: row,
-        start: start,
-        content: []
-    };
-    return blankWord;
 }
 // make a grid of divs with each one containing a space
 // appends the grid to textBox div
@@ -383,4 +400,24 @@ function highlightAt(row, x) {
 function unhighlightAt(row, x) {
     var position = getDivAt(row, x);
     position.removeAttribute("id");
+}
+// takes in a function (row, x) --> perform some action
+// apply it to all the positions occupied by a node
+// TODO: implement for all types of expressions
+// alternate implementation idea: action: div -> div  (pure function)
+// for each position div in the node, set letterDiv = action letterDiv
+function mapActionOverNode(action, node) {
+    if (node.kind == "word") {
+        var row = node.row;
+        var end = node.start + node.content.length;
+        for (var i = node.start; i < end; i++) {
+            action(row, i);
+        }
+    }
+    if (node.kind == "letter") {
+        var row = node.parent.row;
+        console.log("row: ", row);
+        console.log("x: ", node.x);
+        action(row, node.x);
+    }
 }
