@@ -192,6 +192,9 @@ function printExpression(expr : expression) {
     if (expr.kind == "module") {
         return printModule(expr);
     }
+    if (expr.kind == "letter") {
+        return printLetter(expr);
+    }
 }
 
 // print String to the ui directly
@@ -368,17 +371,32 @@ function insertMode(key) {
     }
 }
 
+// inserting a node
+// moving pre-existing nodes to make space for new node
+// printing the new node
+// for each node, based on layout, should know which nodes are to the right on the same line
+
+// set value of cursor node to key
+// make a new cursor node to the right of the old selection
+// make this the new selection
 function insertAtSelection(key) {
+    if (selectedNode.kind === "letter") {
+        selectedNode.value = key;
+        printExpression(selectedNode);
 
-}
+        let newCursor : letter = {
+            kind: "letter",
+            parent: selectedNode.parent,
+            x: selectedNode.x + 1,
+            value: " "
+        }
 
-function put(newNode, currentNode, relativePosition) {
-    if (relativePosition === "last child") {
-        currentNode.content.push(newNode);
-        newNode.parent = currentNode;
-        
+        selectedNode.parent.content.push(newCursor);
+        setSelection(newCursor);
+
     }
 }
+
 
 let lineEndIndices = new Map();
 lineEndIndices.set(0,0);
@@ -595,8 +613,6 @@ function mapActionOverNode(action, node : expression) {
     }
     if (node.kind == "letter") {
         let row = node.parent.row;
-        console.log("row: ", row);
-        console.log("x: ", node.x);
         action(row, node.x);
     }
 }
