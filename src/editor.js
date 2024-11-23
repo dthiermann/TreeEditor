@@ -1,3 +1,4 @@
+"use strict";
 // simple version of application:
 // user is working in a single file / module
 var _a;
@@ -29,10 +30,11 @@ var _a;
 // mode
 // selectednode
 // latest thought
-// position info should only be stored when a node is actually displayed
-// whenever the view changes, 
-// user will only ever be editing a displayed node
-// so whatever edit is being made 
+// new model
+// make changes to the tree (no position information stored)
+// after each input, rerender the definition node
+// the render function takes in a node to print and the selected node
+// it prints the first node and highlights the selected node
 var container = document.createElement("div");
 document.body.appendChild(container);
 container.classList.add("container");
@@ -50,7 +52,6 @@ var documentHeight = Math.max(300, parseInt(storedSize));
 var documentWidth = 100;
 // fill the textbox with a grid of divs
 newDocument(textBox, documentWidth, documentHeight);
-var currentMode = "command";
 var defKeyWord = "define ";
 var documentNode = {
     kind: "module",
@@ -58,8 +59,11 @@ var documentNode = {
     numberOfRows: 0
 };
 var displayedNode = documentNode;
-var selectedNode = documentNode;
-document.addEventListener("keydown", handleInput);
+var state = {
+    mode: "command",
+    selection: documentNode
+};
+document.addEventListener("keydown", main);
 // clear the display of all text and highlighting
 function clearDisplay(documentHeight, documentWidth) {
     for (var row = 0; row < documentHeight; row++) {
@@ -70,21 +74,30 @@ function clearDisplay(documentHeight, documentWidth) {
     }
 }
 // this is the main entry point for the editor program
-function handleInput(e) {
+function main(e) {
     e.preventDefault();
     var key = e.key;
-    if (currentMode == "insert") {
-        insertMode(key);
+    state = handleInput(key, state);
+    console.log(documentNode);
+}
+function handleInput(key, state) {
+    var newState = state;
+    if (state.mode == "insert") {
+        newState = insertMode(key, state.selection);
     }
-    if (currentMode == "command") {
-        commandMode(key);
+    if (state.mode == "command") {
+        newState = commandMode(key, state.selection);
     }
+    return newState;
 }
 var commandMap = new Map();
+// every function in the command map has to be type
+// selection --> info
 commandMap.set("f", addNewFunctionToModule);
-// make a table to handle input
-// mode, key, --> some function
+commandMap.set("p", selectParentOfLetter);
 var insertMap = new Map();
+// every function in insert map needs to be type
+// selection --> { mode, selection} : info
 insertMap.set("Backspace", doNothing);
 insertMap.set("Tab", doNothing);
 insertMap.set("Control", doNothing);
@@ -96,6 +109,7 @@ insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
 insertMap.set("Space", doNothing);
 insertMap.set("Enter", doNothing);
+insertMap.set(";", escapeInsertMode);
 var documentLastRow = 0;
 function printExpression(expr) {
     if (expr.kind === "word") {
@@ -142,51 +156,16 @@ var currentSelection = {
     start: 0,
     end: 0
 };
-function shiftBlockDown(section, shift) {
-    for (var i = section.lastRow; i >= section.firstRow; i--) {
-        var line = {
-            row: i,
-            start: 0,
-            end: documentWidth
-        };
-        moveText(line, i + shift, 0);
-    }
-    for (var i = section.firstRow; i < section.firstRow + shift; i++) {
-        var line = {
-            row: i,
-            start: 0,
-            end: documentWidth
-        };
-        setIntervalText(line, " ");
-    }
-}
 // set every char in an interval to the same char: letter
 function setIntervalText(range, letter) {
     for (var i = range.start; i <= range.end; i++) {
         setCharAt(range.row, i, letter);
     }
 }
-// copy the text from an interval into an array
-// return that array
-function copyTextToArray(range) {
-    var text = [];
-    for (var i = range.start; i <= range.end; i++) {
-        text.push(getCharAt(range.row, i));
-    }
-    return text;
-}
 function copyArrayToPosition(textArray, newRow, newStart) {
     for (var i = 0; i < textArray.length; i++) {
         setCharAt(newRow, newStart + i, textArray[i]);
     }
-}
-// move the text in range to newStart
-// this leaves whitespace in some or all of range
-// this will overwrite preexisting text after newStart
-function moveText(range, newRow, newStart) {
-    var textArray = copyTextToArray(range);
-    setIntervalText(range, " ");
-    copyArrayToPosition(textArray, newRow, newStart);
 }
 // unhighlight the portion of the ui that node takes up
 function unhighlightNode(node) {
@@ -199,39 +178,27 @@ function highlightNode(node) {
 // set selectedNode = newSelection
 // unhighlight the selected portion of ui
 // highlight the new selected node
-function setSelection(newSelection) {
-    unhighlightNode(selectedNode);
-    selectedNode = newSelection;
+function setSelection(oldSelection, newSelection) {
+    unhighlightNode(oldSelection);
     highlightNode(newSelection);
+    return newSelection;
 }
-function shiftText(range, shift) {
-    moveText(range, range.row, range.start + shift);
-}
-function insertBlankLineBelow() {
-    var row = currentSelection.row;
-    // shift every row below down by 1
-    if (row < documentLastRow) {
-        var everythingBelow = {
-            firstRow: row + 1,
-            lastRow: documentLastRow
-        };
-        shiftBlockDown(everythingBelow, 1);
-    }
-    documentLastRow = documentLastRow + 1;
-}
-function commandMode(key) {
+function commandMode(key, selection) {
     if (commandMap.has(key)) {
-        return commandMap.get(key)();
+        return commandMap.get(key)(selection);
+    }
+    else {
+        return { mode: "command", selection: selection };
     }
 }
 // handles user input when in insert mode
-function insertMode(key) {
+function insertMode(key, selection) {
     // if key is not a letter or number, it should have an entry in the insertMap
     if (insertMap.has(key)) {
-        insertMap.get(key)();
+        return insertMap.get(key)(selection);
     }
     else {
-        insertAtSelection(key);
+        return insertAtSelection(key, selection);
     }
 }
 // inserting a node
@@ -241,7 +208,9 @@ function insertMode(key) {
 // set value of cursor node to key
 // make a new cursor node to the right of the old selection
 // make this the new selection
-function insertAtSelection(key) {
+// in order to shift the rest of the line to the right, will eventually
+// recalculate the position indices and rerender the line
+function insertAtSelection(key, selectedNode) {
     if (selectedNode.kind === "letter") {
         selectedNode.value = key;
         printExpression(selectedNode);
@@ -252,32 +221,32 @@ function insertAtSelection(key) {
             value: " "
         };
         selectedNode.parent.content.push(newCursor);
-        setSelection(newCursor);
+        // return the new selected node
+        var newSelection = setSelection(selectedNode, newCursor);
+        return { mode: "insert", selection: newSelection };
+    }
+    else {
+        return { mode: "insert", selection: selectedNode };
     }
 }
-var lineEndIndices = new Map();
-lineEndIndices.set(0, 0);
-function doNothing() {
+function doNothing(selection) {
     return true;
 }
 var shiftMap = new Map();
-// make a new blank node of type nodeType
-function makeNew(nodeType) {
-    if (nodeType == "word") {
-        return makeNewWord();
-    }
-    else if (nodeType == "definition") {
-        return makeNewDef();
-    }
-}
 function makeNewDef() {
+    var name = {
+        kind: "word",
+        content: [],
+        row: 0,
+        start: defKeyWord.length
+    };
     var newNode = {
         kind: "definition",
         firstRow: 0,
         arguments: [],
         body: [],
         numberOfRows: 1,
-        name: makeNewWord()
+        name: name
     };
     return newNode;
 }
@@ -290,29 +259,52 @@ function makeNewWord() {
     };
     return newWord;
 }
+// change from insert mode to command mode
+function escapeInsertMode(selection) {
+    return { mode: "command", selection: selection };
+}
+// mode = command
+// text = define myfunction_
+// -->
+// mode = command
+// define [myfunction]
+function selectParentOfLetter(cursor) {
+    if (cursor.parent === null) {
+        return { mode: "command", selection: cursor };
+    }
+    else {
+        var newSelection = setSelection(cursor, cursor.parent);
+        return { mode: "command", selection: newSelection };
+    }
+}
 // if selection is type module,
 // add function to module
 // display only that function
 // change mode to insert
 // select blank function name so user can start typing the name
-function addNewFunctionToModule() {
+function addNewFunctionToModule(selectedNode) {
     if (selectedNode.kind == "module") {
         // tree: add blank function def to  module
         var blankDef = makeNewDef();
         addDefToModule(blankDef, selectedNode);
         // ui: display the def
         printExpression(blankDef);
-        currentMode = "insert";
         // add a " " node as the first letter of name
-        blankDef.name.content[0] = {
+        var space = {
             kind: "letter",
             parent: blankDef.name,
             x: defKeyWord.length,
             value: " "
         };
+        blankDef.name.content[0] = space;
         // tree and ui: change the selection to this " " node
         // visible result: "define _" where the underscore is selected
-        setSelection(blankDef.name.content[0]);
+        // return the new selection
+        var newSelection = setSelection(selectedNode, blankDef.name.content[0]);
+        return { mode: "insert", selection: newSelection };
+    }
+    else {
+        return { mode: "insert", selection: selectedNode };
     }
 }
 // make the provided def be the last child of the module
@@ -349,7 +341,18 @@ function newDocument(textBox, width, height) {
 function getCharAt(y, x) {
     var rows = textBox.childNodes;
     var rowChildren = rows[y].childNodes;
-    return rowChildren[x].textContent;
+    if (rowChildren === null) {
+        return "Out of bounds row index";
+    }
+    else {
+        var charAtPosition = rowChildren[x].textContent;
+        if (charAtPosition === null) {
+            return "Out of bounds column index";
+        }
+        else {
+            return charAtPosition;
+        }
+    }
 }
 // get div at (y,x) in grid
 function getDivAt(y, x) {
