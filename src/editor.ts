@@ -47,7 +47,7 @@ type application = {
 type definition = {
     kind: "definition";
     name?: word;
-    arguments?: word[];
+    arguments?: word;
     body?: expression[];
     parent?: expression;
 }
@@ -65,7 +65,7 @@ newDocument(textBox, documentWidth, documentHeight);
 
 let defKeyWord = "define ";
 
-let documentNode : expression = {
+let documentNode : module = {
     kind: "module",
     contents: [],
 };
@@ -96,8 +96,11 @@ function clearDisplay(documentHeight : number, documentWidth : number) {
 function main(e : KeyboardEvent) {
     e.preventDefault();
     let key = e.key;
+    // update the mode and selection and tree:
     state = handleInput(key, state);
-    console.log(documentNode);
+    // update the ui:
+    // TODO: print (displayedNode)
+    printModule(documentNode, state.selection);
     
 }
 
@@ -148,14 +151,9 @@ function printExpression(expr : expression) {
 // print String to the ui directly
 // requires string to fit in row
 function printString(str : string, row : number, x: number) {
-    for (let i = x; i < str.length + x; i++) {
-        setCharAt(row, i, str[i]);
+    for (let i = 0; i < str.length; i++) {
+        setCharAt(row, x + i, str[i]);
     }
-}
-
-// print module to ui directly
-function printModule(mod : module) {
-
 }
 
 
@@ -191,17 +189,31 @@ function insertMode(key : string, selection : expression) : info {
         return insertMap.get(key)(selection);
     }
     else {
-        return insertAtSelection(key, selection);
+        return insertAtSelectionInTree(key, selection);
     }
 }
 
-// inserting a node
+// Right now the render part of this function only works for the following case:
+// define _
+// key = "a"
+// --> define a_
+// this function only edits the tree
+function insertAtSelectionInTree(key : string, selectedNode : expression) : info {
+    if (selectedNode.kind === "letter") {
+        selectedNode.value = key;
+        // tree: add a new blank cursor to the right of selectedNode
+        let parentWord = selectedNode.parent;
+        let blankSpace : letter = {
+            kind: "letter",
+            parent: parentWord,
+            value: " ",
+        }
+        parentWord.content.push(blankSpace);
+        
 
-// set value of cursor node to key
-// make a new cursor node to the right of the old selection
-// make this the new selection
-// re render
-function insertAtSelection(key : string, selectedNode : expression) : info {
+        return { mode: "insert", selection: blankSpace};
+    }
+
     return { mode: "insert", selection: selectedNode };
 }
 
@@ -298,8 +310,6 @@ function unhighlightAt(row : number, x : number) {
 }
 
 
-// START: code from here down will assume that the types do not store position info
-
 // add blank def to document
 // this version assumes that no position info is stored in the tree
 // document is selected
@@ -310,12 +320,14 @@ function unhighlightAt(row : number, x : number) {
 // render the blank def:
 // print "define " to (0,0)
 // highlight (0, defKeyWord.length)
-function addBlankDef(document : module) {
+function addBlankDef(document : module) : info {
     // create a blank def, add that def to the document,
     let blankDef : definition = {
         kind: "definition",
         parent: document,
     }
+
+    document.contents.push(blankDef);
 
     let blankName : word = {
         kind: "word",
@@ -334,13 +346,84 @@ function addBlankDef(document : module) {
 
     blankDef.name.content.push(cursor);
 
-    // TODO: de-select document node
-    // mark that cursor node as being selected (in some way)
-
-    // render the blank def:
-    // print "define " to (0,0)
-    // highlight (0, defKeyWord.length)
-    printString(defKeyWord, 0, 0);
-    highlightAt(0, defKeyWord.length);
+    return {mode: "insert", selection: cursor }
 
 }
+
+// prints the first def child of mod
+// doesn't highlight any children, even if they are selected
+function printModule(mod : module, selectedNode : expression) {
+    if (mod.contents[0] === null) {
+
+    }
+    else {
+        printDef(mod.contents[0], selectedNode);
+    }
+}
+
+// print def and check children to see if any are the selection
+// if they are, highlights them,
+function printDef(def : definition, selectedNode : expression) {
+    clearDisplay(documentHeight, documentWidth);
+
+    let row = 0;
+    let x = 0;
+
+    printString(defKeyWord, row, x);
+    x = x + defKeyWord.length;
+
+    let nameLength = 0;
+
+    if (def.name === undefined) {
+
+    }
+    else if (def.name === selectedNode) {
+        printAndHighlightWord(def.name, row, x);
+        nameLength = def.name.content.length;
+    }
+    else {
+        printWord(def.name, row, x, selectedNode);
+        nameLength = def.name.content.length;
+    }
+
+    x = x + nameLength;
+
+}
+
+// prints word and highlights any selected letters
+function printWord(word : word, row : number, x : number, selectedNode : expression) {
+    for (let i = 0; i < word.content.length; i ++) {
+        if (word.content[i] === selectedNode) {
+            highlightAt(row, x + i);
+        }
+            setCharAt(row, x + i, word.content[i].value);
+    }
+    
+}
+
+
+
+// prints and highlights entire word
+function printAndHighlightWord(word : word, row : number, x : number) {
+    for (let i = 0; i < word.content.length; i ++) {
+        setCharAt(row, x + i, word.content[i].value);
+        highlightAt(row, x + i);
+    }
+}
+
+// for each kind of node, there are two functions
+// one that highlights the whole node
+// one that doesnt highlight the whole node and checks to see if any of the children are
+// the selected node, if so, it highlights them
+// 
+
+// alternative:
+// every node has an is-selected flag
+// there is also a reference to the selected node
+// changing selection:
+// switch the selectedNode flag off
+// go through descendants and switch their flags off
+// update selection variable
+// switch new selectedNode's flag on
+// go through descendants and switch their flags on
+// then print function checks the flag and highlights everything
