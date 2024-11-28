@@ -256,27 +256,44 @@ function printModule(mod, selectedNode) {
 // if they are, highlights them,
 function printDef(def, selectedNode) {
     clearDisplay(documentHeight, documentWidth);
-    var row = 0;
-    var x = 0;
-    printString(defKeyWord, row, x);
-    x = x + defKeyWord.length;
-    var nameLength = 0;
-    if (def.name === undefined) {
+    var restOfLine = [];
+    printString(defKeyWord, 0, 0);
+    // need to fix defs of types in order to eliminate undefined
+    // if something is initialized without certain fields
+    // we want those to get a default null value specific to that type
+    var name = {
+        kind: "word",
+        parent: def,
+        content: []
+    };
+    var args = [];
+    if (def.name !== undefined) {
+        name = def.name;
     }
-    else if (def.name === selectedNode) {
-        printAndHighlightWord(def.name, row, x);
-        nameLength = def.name.content.length;
+    if (def.arguments !== undefined) {
+        args = def.arguments;
     }
-    else {
-        printWord(def.name, row, x, selectedNode);
-        nameLength = def.name.content.length;
-    }
-    x = x + nameLength;
+    restOfLine = [name].concat(args);
+    printListOfWords(restOfLine, 0, defKeyWord.length, selectedNode);
+}
+// should print a list of words on one line, separating them by spaces
+function printListOfWords(words, row, x, selectedNode) {
+    var position = x;
+    words.forEach(function (word) {
+        if (word === selectedNode) {
+            printAndHighlightWord(word, row, position);
+        }
+        else {
+            printWord(word, row, position, selectedNode);
+        }
+        position = position + word.content.length + 1;
+    });
 }
 // prints word and highlights any selected letters
 function printWord(word, row, x, selectedNode) {
     for (var i = 0; i < word.content.length; i++) {
         if (word.content[i] === selectedNode) {
+            console.log("x", x);
             highlightAt(row, x + i);
         }
         setCharAt(row, x + i, word.content[i].value);
@@ -304,3 +321,38 @@ function printAndHighlightWord(word, row, x) {
 // switch new selectedNode's flag on
 // go through descendants and switch their flags on
 // then print function checks the flag and highlights everything
+// printing options:
+// define name arg1 arg2 arg3 arg4
+// on one line print(defKeyword + name + arg1 + arg2 + arg3 + arg4)
+// with a space in between everything
+// something like:
+// line = concatWithSpaces(defKeyword, name, printedArgs)
+// where printedArgs = printList(args)
+// could make an array and copy it to the ui
+// turn string "define " into array of letters
+// convert word nodes to array of letters
+// concat them with spaces in between
+// word[]
+// convert: word -> [char]
+// map convert words = x : [[char]]
+// copyListToUI (flatten x)
+// or just print directly
+// printOnLineWithSpaces(list of strings or word nodes)
+// print "define "
+// print name defKeyWord.length
+// print arg1 (defKeyWord.length + name.length)
+// print arg2 (defKeyWord.lenght + name.length + arg1.length)
+// insert mode
+// def.name.child selected
+// input key = space
+// create an empty word and make it def.arguments[0]
+// add a cursor child to def.arguments[0]
+// typing space moves you one node to the right
+// the right sibling depends on the type of node and where you are
+// if cursor is currently at the name of a def
+// isdefname node = (node.parent : def and node.parent.name === node)
+// if the args are empty
+// cursor will end up at start of args
+function insertSpace(selectedNode) {
+    return { mode: "insert", selection: selectedNode };
+}
