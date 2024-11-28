@@ -46,6 +46,7 @@ function main(e) {
     // update the ui:
     // TODO: print (displayedNode)
     printModule(documentNode, state.selection);
+    console.log(documentNode);
 }
 function handleInput(key, state) {
     var newState = state;
@@ -65,7 +66,7 @@ commandMap.set("p", selectParentOfLetter);
 var insertMap = new Map();
 // every function in insert map needs to be type
 // selection --> { mode, selection} : info
-insertMap.set("Backspace", doNothing);
+insertMap.set("Backspace", backSpace);
 insertMap.set("Tab", doNothing);
 insertMap.set("Control", doNothing);
 insertMap.set("Alt", doNothing);
@@ -293,7 +294,6 @@ function printListOfWords(words, row, x, selectedNode) {
 function printWord(word, row, x, selectedNode) {
     for (var i = 0; i < word.content.length; i++) {
         if (word.content[i] === selectedNode) {
-            console.log("x", x);
             highlightAt(row, x + i);
         }
         setCharAt(row, x + i, word.content[i].value);
@@ -306,53 +306,40 @@ function printAndHighlightWord(word, row, x) {
         highlightAt(row, x + i);
     }
 }
-// for each kind of node, there are two functions
-// one that highlights the whole node
-// one that doesnt highlight the whole node and checks to see if any of the children are
-// the selected node, if so, it highlights them
-// 
-// alternative:
-// every node has an is-selected flag
-// there is also a reference to the selected node
-// changing selection:
-// switch the selectedNode flag off
-// go through descendants and switch their flags off
-// update selection variable
-// switch new selectedNode's flag on
-// go through descendants and switch their flags on
-// then print function checks the flag and highlights everything
-// printing options:
-// define name arg1 arg2 arg3 arg4
-// on one line print(defKeyword + name + arg1 + arg2 + arg3 + arg4)
-// with a space in between everything
-// something like:
-// line = concatWithSpaces(defKeyword, name, printedArgs)
-// where printedArgs = printList(args)
-// could make an array and copy it to the ui
-// turn string "define " into array of letters
-// convert word nodes to array of letters
-// concat them with spaces in between
-// word[]
-// convert: word -> [char]
-// map convert words = x : [[char]]
-// copyListToUI (flatten x)
-// or just print directly
-// printOnLineWithSpaces(list of strings or word nodes)
-// print "define "
-// print name defKeyWord.length
-// print arg1 (defKeyWord.length + name.length)
-// print arg2 (defKeyWord.lenght + name.length + arg1.length)
-// insert mode
-// def.name.child selected
-// input key = space
-// create an empty word and make it def.arguments[0]
-// add a cursor child to def.arguments[0]
-// typing space moves you one node to the right
-// the right sibling depends on the type of node and where you are
-// if cursor is currently at the name of a def
-// isdefname node = (node.parent : def and node.parent.name === node)
-// if the args are empty
-// cursor will end up at start of args
+// define sum f_
+// -->
+// define sum _
+function backSpace(cursor) {
+    // if cursor has a left sibling, we want to get it
+    var i = getLeftSiblingIndex(cursor);
+    var word = cursor.parent;
+    var leftSibling = word.content[i];
+    // delete the letter before cursor
+    leftSibling.value = " ";
+    // remove the old cursor node from the tree
+    word.content.splice(i + 1, 1);
+    // change the selection to left sibling
+    return { mode: "insert", selection: leftSibling };
+}
+// for a letter in a word, get the index of the letter to the left
+function getLeftSiblingIndex(cursor) {
+    var parent = cursor.parent;
+    var leftSiblingIndex = 0;
+    for (var i = 0; i < parent.content.length; i++) {
+        if (parent.content[i] === cursor) {
+            leftSiblingIndex = i - 1;
+        }
+    }
+    return leftSiblingIndex;
+}
 function insertSpace(selectedNode) {
     return { mode: "insert", selection: selectedNode };
 }
+// getting weird behavior
+// time to write some tests
+// either the functions that edit the tree are off (making the tree wrong)
+// or the function that prints the tree is off
+// what is happening that is going wrong?
+// f,h,backspace,h,
+// def.name.content should = ["h", " "]
+// instead def.name.content = ["h", " ", " "]
