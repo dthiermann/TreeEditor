@@ -26,7 +26,7 @@ type mode = "insert" | "command";
 
 type letter = {
     kind: "letter";
-    value: string;
+    content: string;
     parent: word
 }
 
@@ -36,20 +36,12 @@ type word = {
     parent: expression;
 }
 
-type application = {
-    kind: "application";
-    row: number;
-    parent: expression;
-    operator: expression;
-    arguments: expression[];
-}
-
 type definition = {
     kind: "definition";
     name?: word;
-    arguments?: word[];
+    arguments: word[];
     body?: expression[];
-    parent?: expression;
+    parent: expression;
 }
 
 type module = {
@@ -66,7 +58,7 @@ type module = {
 // default null values for each type
 // could create a cursor type
 // 
-type expression = letter | word | application | definition | module;
+type expression = letter | word | definition | module;
 
 
 // fill the textbox with a grid of divs
@@ -145,7 +137,7 @@ insertMap.set("ArrowUp", doNothing);
 insertMap.set("ArrowLeft", doNothing);
 insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
-insertMap.set("Space", doNothing);
+insertMap.set("Space", insertSpace);
 insertMap.set("Enter", doNothing);
 
 insertMap.set(";", escapeInsertMode);
@@ -210,13 +202,13 @@ function insertMode(key : string, selection : expression) : info {
 // this function only edits the tree
 function insertAtSelectionInTree(key : string, selectedNode : expression) : info {
     if (selectedNode.kind === "letter") {
-        selectedNode.value = key;
+        selectedNode.content = key;
         // tree: add a new blank cursor to the right of selectedNode
         let parentWord = selectedNode.parent;
         let blankSpace : letter = {
             kind: "letter",
             parent: parentWord,
-            value: " ",
+            content: " ",
         }
         parentWord.content.push(blankSpace);
         
@@ -335,6 +327,7 @@ function addBlankDef(document : module) : info {
     let blankDef : definition = {
         kind: "definition",
         parent: document,
+        arguments: []
     }
 
     document.contents.push(blankDef);
@@ -351,7 +344,7 @@ function addBlankDef(document : module) : info {
     let cursor : letter = {
         kind: "letter",
         parent: blankDef.name,
-        value: " "
+        content: " "
     }
 
     blankDef.name.content.push(cursor);
@@ -379,26 +372,17 @@ function printDef(def : definition, selectedNode : expression) {
     let restOfLine = [];
     printString(defKeyWord, 0, 0);
 
-    // need to fix defs of types in order to eliminate undefined
-    // if something is initialized without certain fields
-    // we want those to get a default null value specific to that type
-
     let name : word = {
         kind: "word",
         parent: def,
         content: []
     }
-    let args : word[] = [];
 
-    if (def.name !== undefined) {
+    if (def.name != undefined) {
         name = def.name;
     }
-    
-    if (def.arguments !== undefined) {
-        args = def.arguments;
-    }
-    
-    restOfLine = [name].concat(args);
+
+    restOfLine = [name].concat(def.arguments);
     printListOfWords(restOfLine, 0, defKeyWord.length, selectedNode);
 
 }
@@ -424,7 +408,7 @@ function printWord(word : word, row : number, x : number, selectedNode : express
         if (word.content[i] === selectedNode) {
             highlightAt(row, x + i);
         }
-            setCharAt(row, x + i, word.content[i].value);
+            setCharAt(row, x + i, word.content[i].content);
     }
     
 }
@@ -433,7 +417,7 @@ function printWord(word : word, row : number, x : number, selectedNode : express
 // prints and highlights entire word
 function printAndHighlightWord(word : word, row : number, x : number) {
     for (let i = 0; i < word.content.length; i ++) {
-        setCharAt(row, x + i, word.content[i].value);
+        setCharAt(row, x + i, word.content[i].content);
         highlightAt(row, x + i);
     }
 }
@@ -443,12 +427,12 @@ function printAndHighlightWord(word : word, row : number, x : number) {
 // define sum _
 function backSpace(cursor : letter) : info {
     // if cursor has a left sibling, we want to get it
-    let i = getLeftSiblingIndex(cursor);
+    let i = getIndexInList(cursor) - 1;
     let word = cursor.parent;
     let leftSibling = word.content[i];
 
     // delete the letter before cursor
-    leftSibling.value = " ";
+    leftSibling.content = " ";
 
     // remove the old cursor node from the tree
     word.content.splice(i + 1, 1);
@@ -457,20 +441,130 @@ function backSpace(cursor : letter) : info {
     return {mode : "insert", selection : leftSibling};
 }
 
-// for a letter in a word, get the index of the letter to the left
-function getLeftSiblingIndex(cursor : letter) : number {
-    let parent = cursor.parent;
-    let leftSiblingIndex = 0;
-    for (let i = 0; i < parent.content.length; i++) {
-        if (parent.content[i] === cursor) {
-            leftSiblingIndex = i - 1;
-        }
+// for a node in a list, get its index
+function getIndexInList(child : letter | word) : number {
+    let parent = child.parent;
+    let index = 0;
+    if (parent.kind === "definition" || parent.kind === "module") {
+        return 0;
     }
-    return leftSiblingIndex;
-}
-
-function insertSpace(selectedNode : expression) : info {
+    else {
+        for (let i = 0; i < parent.content.length; i++) {
+            if (parent.content[i] === child) {
+                index = i;
+            }
+        }
+        return index;
+    }
     
-    return { mode : "insert", selection : selectedNode };
 }
 
+function isAtEndOfWord(cursor : letter) : boolean {
+    let word = cursor.parent;
+    let isLast = word.content.length === getIndexInList(cursor) + 1;
+    return isLast;
+}
+
+function isNameOfSomeDef(myWord : word) : boolean {
+    if (myWord.parent.kind === "definition") {
+        return myWord.parent.name === myWord;
+    }
+    else {
+        return false;
+    }
+}
+
+// is cursor the last letter in a name of a definition
+function isAtEndOfDefName(cursor : letter) : boolean {
+    let word = cursor.parent;
+    return isNameOfSomeDef(word) && isAtEndOfWord(cursor);
+}
+
+// removes node from parent's list of children
+// hopefully gets garbage collected
+function deleteNode(node : expression) {
+    if (node.kind === "letter") {
+        let i = getIndexInList(node);
+        node.parent.content.splice(i, 1);
+
+    }
+}
+
+
+function insertSpace(cursor : letter) : info {
+    // if cursor is at end of definition name
+    // delete cursor node
+    // add a new argument to the front of argument list
+    // make cursor node be the child of new argument
+
+    if (isAtEndOfDefName(cursor) && cursor.parent.parent.kind === "definition") {
+        deleteNode(cursor);
+        let def = cursor.parent.parent;
+        let newArg : word = {
+            kind: "word",
+            content: [],
+            parent: def
+        }
+
+        def.arguments.unshift(newArg);
+
+        let newCursor : letter = {
+            kind: "letter",
+            content: " ",
+            parent: newArg,
+        }
+
+        newArg.content.push(newCursor);
+
+        return { mode: "insert", selection: newCursor};
+
+    }
+    else if (isAtEndOfArg(cursor)) {
+        // delete cursor node
+        // insert a new blank argument to the right
+        // add a cursor node child to this argument
+        deleteNode(cursor);
+        let args = cursor.parent;
+        
+        
+
+    }
+    return { mode: "insert", selection: cursor};
+}
+
+// checks to see if cursor is at the end of one of the arguments in definition
+// Ex: define myfunc hello_ there --> true
+function isAtEndOfArg(cursor : letter) : boolean {
+    let word = cursor.parent;
+    return isArgOfSomeDef(word) && isAtEndOfWord(cursor);
+}
+
+// checks if myWord is one of the arguments of some function definition
+function isArgOfSomeDef(myWord : word) : boolean {
+    let possibleDef = myWord.parent;
+    if (possibleDef.kind === "definition") {
+        return (possibleDef.arguments.includes(myWord));
+    }
+    else {
+        return false;
+    }
+}
+
+// assertion: typing a character in insert mode and then hitting backspace should revert
+// the tree back to the original state (and the ui)
+
+// possible simpler directions for project:
+// could make a basic text editor with backend and collaborating features
+// could make a tree editor for text docs like typst/tex
+
+// has right sibling
+// has left sibling
+// get right sibling
+// get left sibling
+
+// inserting nodes
+// first you make the newNode or get a ref to it
+// then you have an insert newNode relativePosition existingNode
+
+// tree:
+// optional attributes, vs non-optional (possibly null) vs 

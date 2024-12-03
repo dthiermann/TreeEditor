@@ -46,7 +46,7 @@ function main(e) {
     // update the ui:
     // TODO: print (displayedNode)
     printModule(documentNode, state.selection);
-    console.log(documentNode);
+    // console.log(documentNode);
 }
 function handleInput(key, state) {
     var newState = state;
@@ -75,7 +75,7 @@ insertMap.set("ArrowUp", doNothing);
 insertMap.set("ArrowLeft", doNothing);
 insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
-insertMap.set("Space", doNothing);
+insertMap.set("Space", insertSpace);
 insertMap.set("Enter", doNothing);
 insertMap.set(";", escapeInsertMode);
 function printExpression(expr) {
@@ -123,13 +123,13 @@ function insertMode(key, selection) {
 // this function only edits the tree
 function insertAtSelectionInTree(key, selectedNode) {
     if (selectedNode.kind === "letter") {
-        selectedNode.value = key;
+        selectedNode.content = key;
         // tree: add a new blank cursor to the right of selectedNode
         var parentWord = selectedNode.parent;
         var blankSpace = {
             kind: "letter",
             parent: parentWord,
-            value: " ",
+            content: " ",
         };
         parentWord.content.push(blankSpace);
         return { mode: "insert", selection: blankSpace };
@@ -227,6 +227,7 @@ function addBlankDef(document) {
     var blankDef = {
         kind: "definition",
         parent: document,
+        arguments: []
     };
     document.contents.push(blankDef);
     var blankName = {
@@ -239,7 +240,7 @@ function addBlankDef(document) {
     var cursor = {
         kind: "letter",
         parent: blankDef.name,
-        value: " "
+        content: " "
     };
     blankDef.name.content.push(cursor);
     return { mode: "insert", selection: cursor };
@@ -259,22 +260,15 @@ function printDef(def, selectedNode) {
     clearDisplay(documentHeight, documentWidth);
     var restOfLine = [];
     printString(defKeyWord, 0, 0);
-    // need to fix defs of types in order to eliminate undefined
-    // if something is initialized without certain fields
-    // we want those to get a default null value specific to that type
     var name = {
         kind: "word",
         parent: def,
         content: []
     };
-    var args = [];
-    if (def.name !== undefined) {
+    if (def.name != undefined) {
         name = def.name;
     }
-    if (def.arguments !== undefined) {
-        args = def.arguments;
-    }
-    restOfLine = [name].concat(args);
+    restOfLine = [name].concat(def.arguments);
     printListOfWords(restOfLine, 0, defKeyWord.length, selectedNode);
 }
 // should print a list of words on one line, separating them by spaces
@@ -296,13 +290,13 @@ function printWord(word, row, x, selectedNode) {
         if (word.content[i] === selectedNode) {
             highlightAt(row, x + i);
         }
-        setCharAt(row, x + i, word.content[i].value);
+        setCharAt(row, x + i, word.content[i].content);
     }
 }
 // prints and highlights entire word
 function printAndHighlightWord(word, row, x) {
     for (var i = 0; i < word.content.length; i++) {
-        setCharAt(row, x + i, word.content[i].value);
+        setCharAt(row, x + i, word.content[i].content);
         highlightAt(row, x + i);
     }
 }
@@ -311,35 +305,116 @@ function printAndHighlightWord(word, row, x) {
 // define sum _
 function backSpace(cursor) {
     // if cursor has a left sibling, we want to get it
-    var i = getLeftSiblingIndex(cursor);
+    var i = getIndexInList(cursor) - 1;
     var word = cursor.parent;
     var leftSibling = word.content[i];
     // delete the letter before cursor
-    leftSibling.value = " ";
+    leftSibling.content = " ";
     // remove the old cursor node from the tree
     word.content.splice(i + 1, 1);
     // change the selection to left sibling
     return { mode: "insert", selection: leftSibling };
 }
-// for a letter in a word, get the index of the letter to the left
-function getLeftSiblingIndex(cursor) {
-    var parent = cursor.parent;
-    var leftSiblingIndex = 0;
-    for (var i = 0; i < parent.content.length; i++) {
-        if (parent.content[i] === cursor) {
-            leftSiblingIndex = i - 1;
-        }
+// for a node in a list, get its index
+function getIndexInList(child) {
+    var parent = child.parent;
+    var index = 0;
+    if (parent.kind === "definition" || parent.kind === "module") {
+        return 0;
     }
-    return leftSiblingIndex;
+    else {
+        for (var i = 0; i < parent.content.length; i++) {
+            if (parent.content[i] === child) {
+                index = i;
+            }
+        }
+        return index;
+    }
 }
-function insertSpace(selectedNode) {
-    return { mode: "insert", selection: selectedNode };
+function isAtEndOfWord(cursor) {
+    var word = cursor.parent;
+    var isLast = word.content.length === getIndexInList(cursor) + 1;
+    return isLast;
 }
-// getting weird behavior
-// time to write some tests
-// either the functions that edit the tree are off (making the tree wrong)
-// or the function that prints the tree is off
-// what is happening that is going wrong?
-// f,h,backspace,h,
-// def.name.content should = ["h", " "]
-// instead def.name.content = ["h", " ", " "]
+function isNameOfSomeDef(myWord) {
+    if (myWord.parent.kind === "definition") {
+        return myWord.parent.name === myWord;
+    }
+    else {
+        return false;
+    }
+}
+// is cursor the last letter in a name of a definition
+function isAtEndOfDefName(cursor) {
+    var word = cursor.parent;
+    return isNameOfSomeDef(word) && isAtEndOfWord(cursor);
+}
+// removes node from parent's list of children
+// hopefully gets garbage collected
+function deleteNode(node) {
+    if (node.kind === "letter") {
+        var i = getIndexInList(node);
+        node.parent.content.splice(i, 1);
+    }
+}
+function insertSpace(cursor) {
+    // if cursor is at end of definition name
+    // delete cursor node
+    // add a new argument to the front of argument list
+    // make cursor node be the child of new argument
+    if (isAtEndOfDefName(cursor) && cursor.parent.parent.kind === "definition") {
+        deleteNode(cursor);
+        var def = cursor.parent.parent;
+        var newArg = {
+            kind: "word",
+            content: [],
+            parent: def
+        };
+        def.arguments.unshift(newArg);
+        var newCursor = {
+            kind: "letter",
+            content: " ",
+            parent: newArg,
+        };
+        newArg.content.push(newCursor);
+        return { mode: "insert", selection: newCursor };
+    }
+    else if (isAtEndOfArg(cursor)) {
+        // delete cursor node
+        // insert a new blank argument to the right
+        // add a cursor node child to this argument
+        deleteNode(cursor);
+        var args = cursor.parent;
+    }
+    return { mode: "insert", selection: cursor };
+}
+// checks to see if cursor is at the end of one of the arguments in definition
+// Ex: define myfunc hello_ there --> true
+function isAtEndOfArg(cursor) {
+    var word = cursor.parent;
+    return isArgOfSomeDef(word) && isAtEndOfWord(cursor);
+}
+// checks if myWord is one of the arguments of some function definition
+function isArgOfSomeDef(myWord) {
+    var possibleDef = myWord.parent;
+    if (possibleDef.kind === "definition") {
+        return (possibleDef.arguments.includes(myWord));
+    }
+    else {
+        return false;
+    }
+}
+// assertion: typing a character in insert mode and then hitting backspace should revert
+// the tree back to the original state (and the ui)
+// possible simpler directions for project:
+// could make a basic text editor with backend and collaborating features
+// could make a tree editor for text docs like typst/tex
+// has right sibling
+// has left sibling
+// get right sibling
+// get left sibling
+// inserting nodes
+// first you make the newNode or get a ref to it
+// then you have an insert newNode relativePosition existingNode
+// tree:
+// optional attributes, vs non-optional (possibly null) vs 
