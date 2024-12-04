@@ -27,3 +27,15 @@
     background-color: cyan;
     white-space:break-spaces;
 }
+
+.defname {
+    color: yellow;
+}
+
+.defKeyWord {
+    color: red;
+}
+
+.defarg {
+    color: green;
+}

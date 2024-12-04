@@ -34,13 +34,20 @@ function clearDisplay(documentHeight, documentWidth) {
         for (var x = 0; x < documentWidth; x++) {
             setCharAt(row, x, " ");
             unhighlightAt(row, x);
+            setTextColorAt(row, x, "black");
         }
     }
+}
+// testUIfunctions();
+function testUIfunctions() {
+    setTextColorAt(0, 0, "red");
+    setCharAt(0, 0, "a");
 }
 // this is the main entry point for the editor program
 function main(e) {
     e.preventDefault();
     var key = e.key;
+    console.log(key);
     // update the mode and selection and tree:
     state = handleInput(key, state);
     // update the ui:
@@ -75,16 +82,23 @@ insertMap.set("ArrowUp", doNothing);
 insertMap.set("ArrowLeft", doNothing);
 insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
-insertMap.set("Space", insertSpace);
+insertMap.set(" ", insertSpace);
 insertMap.set("Enter", doNothing);
 insertMap.set(";", escapeInsertMode);
 function printExpression(expr) {
 }
 // print String to the ui directly
 // requires string to fit in row
-function printString(str, row, x) {
+function printString(str, row, x, color) {
     for (var i = 0; i < str.length; i++) {
         setCharAt(row, x + i, str[i]);
+        setTextColorAt(row, x + i, color);
+    }
+}
+function setTextColorAt(row, x, color) {
+    var div = getDivAt(row, x);
+    if (div !== null) {
+        div.style.color = color;
     }
 }
 function copyArrayToPosition(textArray, newRow, newStart) {
@@ -192,9 +206,21 @@ function getCharAt(y, x) {
 }
 // get div at (y,x) in grid
 function getDivAt(y, x) {
-    var rows = textBox.children;
-    var rowChildren = rows[y].children;
-    return rowChildren[x];
+    var rows = textBox.childNodes;
+    var rowChildren = rows[y].childNodes;
+    if (rowChildren === null) {
+        return null;
+    }
+    else {
+        var divAtPosition = rowChildren[x];
+        if (divAtPosition === null) {
+            return null;
+        }
+        else {
+            var divElement = divAtPosition;
+            return divElement;
+        }
+    }
 }
 // set char at (y,x) to newChar
 function setCharAt(y, x, newChar) {
@@ -205,12 +231,16 @@ function setCharAt(y, x, newChar) {
 // highlight the rectangle at (y,x)
 function highlightAt(row, x) {
     var position = getDivAt(row, x);
-    position.setAttribute("id", "selection");
+    if (position !== null) {
+        position.setAttribute("id", "selection");
+    }
 }
 // remove highlighting from rectangle at (y,x)
 function unhighlightAt(row, x) {
     var position = getDivAt(row, x);
-    position.removeAttribute("id");
+    if (position !== null) {
+        position.removeAttribute("id");
+    }
 }
 // add blank def to document
 // this version assumes that no position info is stored in the tree
@@ -233,6 +263,7 @@ function addBlankDef(document) {
     var blankName = {
         kind: "word",
         parent: blankDef,
+        color: defNameColor,
         content: [],
     };
     blankDef.name = blankName;
@@ -254,16 +285,19 @@ function printModule(mod, selectedNode) {
         printDef(mod.contents[0], selectedNode);
     }
 }
+var defNameColor = "red";
+var defKeyWordColor = "blue";
 // print def and check children to see if any are the selection
 // if they are, highlights them,
 function printDef(def, selectedNode) {
     clearDisplay(documentHeight, documentWidth);
     var restOfLine = [];
-    printString(defKeyWord, 0, 0);
+    printString(defKeyWord, 0, 0, defKeyWordColor);
     var name = {
         kind: "word",
         parent: def,
-        content: []
+        content: [],
+        color: defNameColor,
     };
     if (def.name != undefined) {
         name = def.name;
@@ -279,17 +313,18 @@ function printListOfWords(words, row, x, selectedNode) {
             printAndHighlightWord(word, row, position);
         }
         else {
-            printWord(word, row, position, selectedNode);
+            printWord(word, row, position, selectedNode, word.color);
         }
         position = position + word.content.length + 1;
     });
 }
 // prints word and highlights any selected letters
-function printWord(word, row, x, selectedNode) {
+function printWord(word, row, x, selectedNode, color) {
     for (var i = 0; i < word.content.length; i++) {
         if (word.content[i] === selectedNode) {
             highlightAt(row, x + i);
         }
+        setTextColorAt(row, x + i, color);
         setCharAt(row, x + i, word.content[i].content);
     }
 }
@@ -357,18 +392,21 @@ function deleteNode(node) {
         node.parent.content.splice(i, 1);
     }
 }
+var defArgColor = "green";
 function insertSpace(cursor) {
     // if cursor is at end of definition name
     // delete cursor node
     // add a new argument to the front of argument list
     // make cursor node be the child of new argument
+    console.log("hello");
     if (isAtEndOfDefName(cursor) && cursor.parent.parent.kind === "definition") {
-        deleteNode(cursor);
         var def = cursor.parent.parent;
+        deleteNode(cursor);
         var newArg = {
             kind: "word",
             content: [],
-            parent: def
+            parent: def,
+            color: defArgColor,
         };
         def.arguments.unshift(newArg);
         var newCursor = {
@@ -418,3 +456,7 @@ function isArgOfSomeDef(myWord) {
 // then you have an insert newNode relativePosition existingNode
 // tree:
 // optional attributes, vs non-optional (possibly null) vs 
+// syntax highlighting
+// words should store identifiers like "defname" "defarg" "defKeyWord"
+// these will determine the text color
+// for getting siblings of nodes, could keep a list [name, args, body]
