@@ -15,6 +15,8 @@ commandTable.textContent = "Commands";
 var storedSize = (_a = localStorage.getItem("displayed-node-size")) !== null && _a !== void 0 ? _a : "300";
 var documentHeight = Math.max(300, parseInt(storedSize));
 var documentWidth = 100;
+var defNameColor = "red";
+var defKeyWordColor = "blue";
 // fill the textbox with a grid of divs
 newDocument(textBox, documentWidth, documentHeight);
 var defKeyWord = "define ";
@@ -47,13 +49,11 @@ function testUIfunctions() {
 function main(e) {
     e.preventDefault();
     var key = e.key;
-    console.log(key);
+    // console.log(key);
     // update the mode and selection and tree:
     state = handleInput(key, state);
     // update the ui:
-    // TODO: print (displayedNode)
     printModule(documentNode, state.selection);
-    // console.log(documentNode);
 }
 function handleInput(key, state) {
     var newState = state;
@@ -106,12 +106,6 @@ function copyArrayToPosition(textArray, newRow, newStart) {
         setCharAt(newRow, newStart + i, textArray[i]);
     }
 }
-// set selectedNode = newSelection
-// unhighlight the selected portion of ui
-// highlight the new selected node
-function setSelection(oldSelection, newSelection) {
-    return newSelection;
-}
 function commandMode(key, selection) {
     if (commandMap.has(key)) {
         return commandMap.get(key)(selection);
@@ -130,25 +124,35 @@ function insertMode(key, selection) {
         return insertAtSelectionInTree(key, selection);
     }
 }
-// Right now the render part of this function only works for the following case:
-// define _
-// key = "a"
-// --> define a_
-// this function only edits the tree
-function insertAtSelectionInTree(key, selectedNode) {
-    if (selectedNode.kind === "letter") {
-        selectedNode.content = key;
-        // tree: add a new blank cursor to the right of selectedNode
-        var parentWord = selectedNode.parent;
-        var blankSpace = {
-            kind: "letter",
-            parent: parentWord,
-            content: " ",
-        };
-        parentWord.content.push(blankSpace);
-        return { mode: "insert", selection: blankSpace };
+function insertAtSelectionInTree(key, selection) {
+    if (selection.kind === "letter") {
+        return insertAtCursorInTree(key, selection);
     }
-    return { mode: "insert", selection: selectedNode };
+    else {
+        return { mode: "insert", selection: selection };
+    }
+}
+// assuming selection is a single empty space (cursor)
+function insertAtCursorInTree(key, cursor) {
+    // decompose into steps:
+    // at cursor location, set letter value to key
+    // create a new cursor 
+    cursor.content = key;
+    // tree: add a new blank cursor to the right of selectedNode
+    var parentWord = cursor.parent;
+    var newCursor = addCursorToEndOfWord(parentWord);
+    return { mode: "insert", selection: newCursor };
+}
+// adds cursor (blank space letter node) as last child of word
+// returns the cursor
+function addCursorToEndOfWord(parent) {
+    var blankSpace = {
+        kind: "letter",
+        parent: parent,
+        content: " ",
+    };
+    parent.content.push(blankSpace);
+    return blankSpace;
 }
 function doNothing(selection) {
     return true;
@@ -168,8 +172,7 @@ function selectParentOfLetter(cursor) {
         return { mode: "command", selection: cursor };
     }
     else {
-        var newSelection = setSelection(cursor, cursor.parent);
-        return { mode: "command", selection: newSelection };
+        return { mode: "command", selection: cursor.parent };
     }
 }
 // make a grid of divs with each one containing a space
@@ -253,17 +256,22 @@ function unhighlightAt(row, x) {
 // print "define " to (0,0)
 // highlight (0, defKeyWord.length)
 function addBlankDef(document) {
+    // creating a default blank def
+    // adding it to document
+    // selecting def.name
+    // adding child cursor to def.name
+    // selecting cursor
     // create a blank def, add that def to the document,
     var blankDef = {
         kind: "definition",
         parent: document,
-        arguments: []
+        name: null,
+        parameters: []
     };
     document.contents.push(blankDef);
     var blankName = {
-        kind: "word",
+        kind: "defName",
         parent: blankDef,
-        color: defNameColor,
         content: [],
     };
     blankDef.name = blankName;
@@ -285,24 +293,22 @@ function printModule(mod, selectedNode) {
         printDef(mod.contents[0], selectedNode);
     }
 }
-var defNameColor = "red";
-var defKeyWordColor = "blue";
 // print def and check children to see if any are the selection
 // if they are, highlights them,
 function printDef(def, selectedNode) {
     clearDisplay(documentHeight, documentWidth);
-    var restOfLine = [];
     printString(defKeyWord, 0, 0, defKeyWordColor);
     var name = {
-        kind: "word",
+        kind: "defName",
         parent: def,
         content: [],
-        color: defNameColor,
     };
-    if (def.name != undefined) {
+    if (def.name != null) {
         name = def.name;
     }
-    restOfLine = [name].concat(def.arguments);
+    var nameList = [name];
+    var parameters = def.parameters;
+    var restOfLine = nameList.concat(parameters);
     printListOfWords(restOfLine, 0, defKeyWord.length, selectedNode);
 }
 // should print a list of words on one line, separating them by spaces
@@ -313,13 +319,18 @@ function printListOfWords(words, row, x, selectedNode) {
             printAndHighlightWord(word, row, position);
         }
         else {
-            printWord(word, row, position, selectedNode, word.color);
+            printWord(word, row, position, selectedNode);
         }
         position = position + word.content.length + 1;
     });
 }
+var colorTable = new Map();
+colorTable.set("defName", "red");
+colorTable.set("parameter", "blue");
+colorTable.set("defKeyWord", "green");
 // prints word and highlights any selected letters
-function printWord(word, row, x, selectedNode, color) {
+function printWord(word, row, x, selectedNode) {
+    var color = colorTable.get(word.kind);
     for (var i = 0; i < word.content.length; i++) {
         if (word.content[i] === selectedNode) {
             highlightAt(row, x + i);
@@ -354,7 +365,7 @@ function backSpace(cursor) {
 function getIndexInList(child) {
     var parent = child.parent;
     var index = 0;
-    if (parent.kind === "definition" || parent.kind === "module") {
+    if (parent.kind === "definition") {
         return 0;
     }
     else {
@@ -398,17 +409,15 @@ function insertSpace(cursor) {
     // delete cursor node
     // add a new argument to the front of argument list
     // make cursor node be the child of new argument
-    console.log("hello");
     if (isAtEndOfDefName(cursor) && cursor.parent.parent.kind === "definition") {
         var def = cursor.parent.parent;
         deleteNode(cursor);
         var newArg = {
-            kind: "word",
+            kind: "parameter",
             content: [],
             parent: def,
-            color: defArgColor,
         };
-        def.arguments.unshift(newArg);
+        def.parameters.unshift(newArg);
         var newCursor = {
             kind: "letter",
             content: " ",
@@ -434,19 +443,8 @@ function isAtEndOfArg(cursor) {
 }
 // checks if myWord is one of the arguments of some function definition
 function isArgOfSomeDef(myWord) {
-    var possibleDef = myWord.parent;
-    if (possibleDef.kind === "definition") {
-        return (possibleDef.arguments.includes(myWord));
-    }
-    else {
-        return false;
-    }
+    return (myWord.kind === "parameter");
 }
-// assertion: typing a character in insert mode and then hitting backspace should revert
-// the tree back to the original state (and the ui)
-// possible simpler directions for project:
-// could make a basic text editor with backend and collaborating features
-// could make a tree editor for text docs like typst/tex
 // has right sibling
 // has left sibling
 // get right sibling
@@ -454,9 +452,52 @@ function isArgOfSomeDef(myWord) {
 // inserting nodes
 // first you make the newNode or get a ref to it
 // then you have an insert newNode relativePosition existingNode
-// tree:
-// optional attributes, vs non-optional (possibly null) vs 
 // syntax highlighting
 // words should store identifiers like "defname" "defarg" "defKeyWord"
 // these will determine the text color
 // for getting siblings of nodes, could keep a list [name, args, body]
+// if the attributes are not ordered (like name, args, body),
+// then it makes sense to not navigate like siblings
+// instead have keys that directly select name, args, or body,
+// define natural
+//   zero or (s natural)
+// basic tree motions
+// select parent
+// select left sibling
+// select right sibling
+// select first child
+// create cursor node
+// set cursor node to a specific value
+// create empty word node
+// delete node
+// insert node in first child position
+// insert node in last child position
+// moving from defname to body:
+// select parent (kind defname)
+// select parent (def)
+// select def.body : list statements
+// create new blank statement
+// insert blank statement as first child of def.body
+// create newword node
+// insert word node as first child of statement
+// create new cursor node
+// insert cursor node as first child of word
+// composing actions
+// (mode, selection, tree) + key --> (newMode, newSelection, newTree)
+// but tree is actually modified in place
+// actions depend on (mode, selectionType, key)
+// so could have one table where the keys are (mode, selectionType, key)
+// and the values are the action functions
+// selectionTypes = letter, defname, defArg, defArgList, defBody, def, statement/expression,
+// word = defname | defArg | ...
+// could keep def children all in one list, to make it easier to implement sibling movement
+// (mode, selection, selectionType) + key --> (newMode, newSelection)
+// most commands : selection -> selection  (side effect: tree changes)
+// mode switch commands:
+// insert -> command (may also change the selection)
+// command -> insert (may also change the selection)
+// make types more specific?
+// cursor type
+// defname type
+// defarg type
+// defbody type

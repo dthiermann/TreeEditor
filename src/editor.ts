@@ -17,6 +17,9 @@ let storedSize = localStorage.getItem("displayed-node-size") ?? "300";
 let documentHeight = Math.max(300, parseInt(storedSize));
 let documentWidth = 100;
 
+let defNameColor = "red";
+let defKeyWordColor = "blue";
+
 type info = {
     mode: mode;
     selection: expression
@@ -30,19 +33,25 @@ type letter = {
     parent: word
 }
 
-type word = {
-    kind: "word";
-    color: string;
+type word = defName | parameter
+
+type defName = {
+    kind: "defName";
     content: letter[];
-    parent: expression;
+    parent: definition;
 }
 
+type parameter = {
+    kind: "parameter";
+    content: letter[];
+    parent: definition;
+}
 type definition = {
     kind: "definition";
-    name?: word;
-    arguments: word[];
+    name: defName | null;
+    parameters: parameter[];
     body?: expression[];
-    parent: expression;
+    parent: module;
 }
 
 type module = {
@@ -105,14 +114,11 @@ function testUIfunctions() {
 function main(e : KeyboardEvent) {
     e.preventDefault();
     let key = e.key;
-    console.log(key);
+    // console.log(key);
     // update the mode and selection and tree:
     state = handleInput(key, state);
     // update the ui:
-    // TODO: print (displayedNode)
     printModule(documentNode, state.selection);
-    // console.log(documentNode);
-    
 }
 
 function handleInput(key : string, state : info) : info {
@@ -183,14 +189,6 @@ function copyArrayToPosition(textArray : string[], newRow : number, newStart : n
 }
 
 
-
-// set selectedNode = newSelection
-// unhighlight the selected portion of ui
-// highlight the new selected node
-function setSelection(oldSelection: expression, newSelection : expression) : expression {
-    return newSelection;
-}
-
 function commandMode(key : string, selection : expression) : info {
     if (commandMap.has(key)) {
         return commandMap.get(key)(selection);
@@ -212,28 +210,41 @@ function insertMode(key : string, selection : expression) : info {
     }
 }
 
-// Right now the render part of this function only works for the following case:
-// define _
-// key = "a"
-// --> define a_
-// this function only edits the tree
-function insertAtSelectionInTree(key : string, selectedNode : expression) : info {
-    if (selectedNode.kind === "letter") {
-        selectedNode.content = key;
-        // tree: add a new blank cursor to the right of selectedNode
-        let parentWord = selectedNode.parent;
-        let blankSpace : letter = {
-            kind: "letter",
-            parent: parentWord,
-            content: " ",
-        }
-        parentWord.content.push(blankSpace);
-        
-
-        return { mode: "insert", selection: blankSpace};
+function insertAtSelectionInTree(key : string, selection : expression) : info {
+    if (selection.kind === "letter") {
+        return insertAtCursorInTree(key, selection);
+    }
+    else {
+        return {mode: "insert", selection: selection};
     }
 
-    return { mode: "insert", selection: selectedNode };
+}
+
+// assuming selection is a single empty space (cursor)
+function insertAtCursorInTree(key : string, cursor : letter) : info {
+    // decompose into steps:
+    // at cursor location, set letter value to key
+    // create a new cursor 
+    cursor.content = key;
+
+    // tree: add a new blank cursor to the right of selectedNode
+    let parentWord = cursor.parent;
+
+    let newCursor = addCursorToEndOfWord(parentWord);
+    
+    return { mode: "insert", selection: newCursor };
+}
+
+// adds cursor (blank space letter node) as last child of word
+// returns the cursor
+function addCursorToEndOfWord(parent : word) {
+    let blankSpace : letter = {
+        kind: "letter",
+        parent: parent,
+        content: " ",
+    }
+    parent.content.push(blankSpace);
+    return blankSpace;
 }
 
 
@@ -260,8 +271,7 @@ function selectParentOfLetter(cursor : letter) : info {
         return { mode: "command", selection: cursor};
     }
     else {
-        let newSelection = setSelection(cursor, cursor.parent);
-        return { mode: "command", selection: newSelection };
+        return { mode: "command", selection: cursor.parent };
     }
 }
   
@@ -358,19 +368,25 @@ function unhighlightAt(row : number, x : number) {
 // print "define " to (0,0)
 // highlight (0, defKeyWord.length)
 function addBlankDef(document : module) : info {
+    // creating a default blank def
+    // adding it to document
+    // selecting def.name
+    // adding child cursor to def.name
+    // selecting cursor
+
     // create a blank def, add that def to the document,
     let blankDef : definition = {
         kind: "definition",
         parent: document,
-        arguments: []
+        name: null,
+        parameters: []
     }
 
     document.contents.push(blankDef);
 
-    let blankName : word = {
-        kind: "word",
+    let blankName : defName = {
+        kind: "defName",
         parent: blankDef,
-        color: defNameColor,
         content: [],
     }
 
@@ -400,29 +416,30 @@ function printModule(mod : module, selectedNode : expression) {
     }
 }
 
-let defNameColor = "red";
-let defKeyWordColor = "blue";
+
 
 // print def and check children to see if any are the selection
 // if they are, highlights them,
 function printDef(def : definition, selectedNode : expression) {
     clearDisplay(documentHeight, documentWidth);
 
-    let restOfLine = [];
     printString(defKeyWord, 0, 0, defKeyWordColor);
 
-    let name : word = {
-        kind: "word",
+    let name : defName = {
+        kind: "defName",
         parent: def,
         content: [],
-        color: defNameColor,
     }
 
-    if (def.name != undefined) {
+    if (def.name != null) {
         name = def.name;
     }
 
-    restOfLine = [name].concat(def.arguments);
+    let nameList : word[] = [name];
+    let parameters = def.parameters as word[];
+
+    let restOfLine = nameList.concat(parameters);
+   
     printListOfWords(restOfLine, 0, defKeyWord.length, selectedNode);
 
 }
@@ -435,15 +452,20 @@ function printListOfWords(words : word[], row: number, x: number, selectedNode :
             printAndHighlightWord(word, row, position);
         }
         else {
-            printWord(word, row, position, selectedNode, word.color);
+            printWord(word, row, position, selectedNode);
         }
         position = position + word.content.length + 1;
     })
 }
 
+let colorTable = new Map();
+colorTable.set("defName", "red");
+colorTable.set("parameter", "blue");
+colorTable.set("defKeyWord", "green");
 
 // prints word and highlights any selected letters
-function printWord(word : word, row : number, x : number, selectedNode : expression, color : string) {
+function printWord(word : word, row : number, x : number, selectedNode : expression) {
+    let color = colorTable.get(word.kind);
     for (let i = 0; i < word.content.length; i ++) {
         if (word.content[i] === selectedNode) {
             highlightAt(row, x + i);
@@ -486,7 +508,7 @@ function backSpace(cursor : letter) : info {
 function getIndexInList(child : letter | word) : number {
     let parent = child.parent;
     let index = 0;
-    if (parent.kind === "definition" || parent.kind === "module") {
+    if (parent.kind === "definition") {
         return 0;
     }
     else {
@@ -538,19 +560,17 @@ function insertSpace(cursor : letter) : info {
     // delete cursor node
     // add a new argument to the front of argument list
     // make cursor node be the child of new argument
-    console.log("hello");
 
     if (isAtEndOfDefName(cursor) && cursor.parent.parent.kind === "definition") {
         let def = cursor.parent.parent;
         deleteNode(cursor);
-        let newArg : word = {
-            kind: "word",
+        let newArg : parameter = {
+            kind: "parameter",
             content: [],
             parent: def,
-            color: defArgColor,
         }
 
-        def.arguments.unshift(newArg);
+        def.parameters.unshift(newArg);
 
         let newCursor : letter = {
             kind: "letter",
@@ -585,21 +605,10 @@ function isAtEndOfArg(cursor : letter) : boolean {
 
 // checks if myWord is one of the arguments of some function definition
 function isArgOfSomeDef(myWord : word) : boolean {
-    let possibleDef = myWord.parent;
-    if (possibleDef.kind === "definition") {
-        return (possibleDef.arguments.includes(myWord));
-    }
-    else {
-        return false;
-    }
+    return (myWord.kind === "parameter")
 }
 
-// assertion: typing a character in insert mode and then hitting backspace should revert
-// the tree back to the original state (and the ui)
 
-// possible simpler directions for project:
-// could make a basic text editor with backend and collaborating features
-// could make a tree editor for text docs like typst/tex
 
 // has right sibling
 // has left sibling
@@ -610,11 +619,61 @@ function isArgOfSomeDef(myWord : word) : boolean {
 // first you make the newNode or get a ref to it
 // then you have an insert newNode relativePosition existingNode
 
-// tree:
-// optional attributes, vs non-optional (possibly null) vs 
-
 // syntax highlighting
 // words should store identifiers like "defname" "defarg" "defKeyWord"
 // these will determine the text color
 // for getting siblings of nodes, could keep a list [name, args, body]
+// if the attributes are not ordered (like name, args, body),
+// then it makes sense to not navigate like siblings
+// instead have keys that directly select name, args, or body,
+
+
+// define natural
+//   zero or (s natural)
+
+// basic tree motions
+// select parent
+// select left sibling
+// select right sibling
+// select first child
+
+// create cursor node
+// set cursor node to a specific value
+// create empty word node
+// delete node
+// insert node in first child position
+// insert node in last child position
+
+// moving from defname to body:
+// select parent (kind defname)
+// select parent (def)
+// select def.body : list statements
+// create new blank statement
+// insert blank statement as first child of def.body
+// create newword node
+// insert word node as first child of statement
+// create new cursor node
+// insert cursor node as first child of word
+
+// composing actions
+// (mode, selection, tree) + key --> (newMode, newSelection, newTree)
+// but tree is actually modified in place
+// actions depend on (mode, selectionType, key)
+// so could have one table where the keys are (mode, selectionType, key)
+// and the values are the action functions
+// selectionTypes = letter, defname, defArg, defArgList, defBody, def, statement/expression,
+// word = defname | defArg | ...
+// could keep def children all in one list, to make it easier to implement sibling movement
+
+// (mode, selection, selectionType) + key --> (newMode, newSelection)
+// most commands : selection -> selection  (side effect: tree changes)
+// mode switch commands:
+// insert -> command (may also change the selection)
+// command -> insert (may also change the selection)
+
+// make types more specific?
+// cursor type
+// defname type
+// defarg type
+// defbody type
 
