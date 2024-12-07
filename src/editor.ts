@@ -17,8 +17,17 @@ let storedSize = localStorage.getItem("displayed-node-size") ?? "300";
 let documentHeight = Math.max(300, parseInt(storedSize));
 let documentWidth = 100;
 
-let defNameColor = "red";
-let defKeyWordColor = "blue";
+type nodeType = "defName" | "parameter" | "defKeyword";
+type color = "red" | "blue" | "green" | "black";
+
+let colorTable : Map<nodeType, color> = new Map();
+colorTable.set("defName", "red");
+colorTable.set("parameter", "blue");
+colorTable.set("defKeyword", "green");
+
+function getColor(key : nodeType) : color {
+    return colorTable.get(key) ?? "black";
+}
 
 type info = {
     mode: mode;
@@ -58,6 +67,10 @@ type module = {
     kind: "module";
     contents: definition[];
 }
+
+// constructors: (could turn some of these types into classes)
+
+
 
 // expression could be a generic type that takes children's type as input
 // letter = expression string
@@ -167,14 +180,15 @@ function printExpression(expr : expression) {
 
 // print String to the ui directly
 // requires string to fit in row
-function printString(str : string, row : number, x: number, color: string) {
+function printString(str : string, row : number, x: number, color: color) {
     for (let i = 0; i < str.length; i++) {
-        setCharAt(row, x + i, str[i]);
         setTextColorAt(row, x + i, color);
+        setCharAt(row, x + i, str[i]);
+        
     }
 }
 
-function setTextColorAt(row : number, x: number, color : string) {
+function setTextColorAt(row : number, x: number, color : color) {
     let div = getDivAt(row, x);
     if (div !== null) {
         div.style.color = color;
@@ -266,13 +280,13 @@ function escapeInsertMode(selection : expression) : info {
 // -->
 // mode = command
 // define [myfunction]
-function selectParentOfLetter(cursor : letter) : info {
-    if (cursor.parent === null) {
-        return { mode: "command", selection: cursor};
+function selectParentOfLetter(char : letter) : info {
+    // if char is just a blank cursor, we want to delete it
+    let newSelection = char.parent
+    if (char.content == " ") {
+        deleteNode(char);
     }
-    else {
-        return { mode: "command", selection: cursor.parent };
-    }
+    return { mode: "command", selection: newSelection };
 }
   
 
@@ -358,51 +372,35 @@ function unhighlightAt(row : number, x : number) {
 
 
 // add blank def to document
-// this version assumes that no position info is stored in the tree
 // document is selected
 // create a blank def, add that def to the document,
 // add a child cursor node to def.name
 // de-select document node
 // mark that cursor node as being selected (in some way)
-// render the blank def:
-// print "define " to (0,0)
-// highlight (0, defKeyWord.length)
 function addBlankDef(document : module) : info {
-    // creating a default blank def
-    // adding it to document
-    // selecting def.name
-    // adding child cursor to def.name
-    // selecting cursor
 
     // create a blank def, add that def to the document,
+    let blankDef = addBlankDefToModule(document);
+    
+    // create a blank name, add that name to the def,
+    let blankName = addBlankNameToDef(blankDef);
+
+    // add a child cursor node to blankName
+    let cursor = addCursorToEndOfWord(blankName);
+
+    return {mode: "insert", selection: cursor };
+
+}
+
+function addBlankDefToModule(mod : module) : definition {
     let blankDef : definition = {
         kind: "definition",
-        parent: document,
+        parent: mod,
         name: null,
         parameters: []
     }
-
-    document.contents.push(blankDef);
-
-    let blankName : defName = {
-        kind: "defName",
-        parent: blankDef,
-        content: [],
-    }
-
-    blankDef.name = blankName;
-
-    // add a child cursor node to def.name
-    let cursor : letter = {
-        kind: "letter",
-        parent: blankDef.name,
-        content: " "
-    }
-
-    blankDef.name.content.push(cursor);
-
-    return {mode: "insert", selection: cursor }
-
+    mod.contents.push(blankDef);
+    return blankDef;
 }
 
 // prints the first def child of mod
@@ -416,14 +414,12 @@ function printModule(mod : module, selectedNode : expression) {
     }
 }
 
-
-
 // print def and check children to see if any are the selection
 // if they are, highlights them,
 function printDef(def : definition, selectedNode : expression) {
     clearDisplay(documentHeight, documentWidth);
 
-    printString(defKeyWord, 0, 0, defKeyWordColor);
+    printString(defKeyWord, 0, 0, getColor("defKeyword"));
 
     let name : defName = {
         kind: "defName",
@@ -458,14 +454,11 @@ function printListOfWords(words : word[], row: number, x: number, selectedNode :
     })
 }
 
-let colorTable = new Map();
-colorTable.set("defName", "red");
-colorTable.set("parameter", "blue");
-colorTable.set("defKeyWord", "green");
+
 
 // prints word and highlights any selected letters
 function printWord(word : word, row : number, x : number, selectedNode : expression) {
-    let color = colorTable.get(word.kind);
+    let color = getColor(word.kind);
     for (let i = 0; i < word.content.length; i ++) {
         if (word.content[i] === selectedNode) {
             highlightAt(row, x + i);
@@ -529,12 +522,7 @@ function isAtEndOfWord(cursor : letter) : boolean {
 }
 
 function isNameOfSomeDef(myWord : word) : boolean {
-    if (myWord.parent.kind === "definition") {
-        return myWord.parent.name === myWord;
-    }
-    else {
-        return false;
-    }
+    return myWord.kind === "defName";
 }
 
 // is cursor the last letter in a name of a definition
@@ -551,9 +539,24 @@ function deleteNode(node : expression) {
         node.parent.content.splice(i, 1);
 
     }
+    else if (node.kind === "defName") {
+        let def = node.parent;
+        // set defname to blank name
+        let blankName = addBlankNameToDef(def);
+        addCursorToEndOfWord(blankName);
+
+    }
 }
 
-let defArgColor = "green";
+function addBlankNameToDef(def : definition) : defName {
+    let blankName : defName = {
+        kind: "defName",
+        content: [],
+        parent: def
+    }
+    def.name = blankName;
+    return blankName;
+}
 
 function insertSpace(cursor : letter) : info {
     // if cursor is at end of definition name
@@ -607,6 +610,7 @@ function isAtEndOfArg(cursor : letter) : boolean {
 function isArgOfSomeDef(myWord : word) : boolean {
     return (myWord.kind === "parameter")
 }
+
 
 
 

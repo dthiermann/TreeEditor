@@ -15,8 +15,14 @@ commandTable.textContent = "Commands";
 var storedSize = (_a = localStorage.getItem("displayed-node-size")) !== null && _a !== void 0 ? _a : "300";
 var documentHeight = Math.max(300, parseInt(storedSize));
 var documentWidth = 100;
-var defNameColor = "red";
-var defKeyWordColor = "blue";
+var colorTable = new Map();
+colorTable.set("defName", "red");
+colorTable.set("parameter", "blue");
+colorTable.set("defKeyword", "green");
+function getColor(key) {
+    var _a;
+    return (_a = colorTable.get(key)) !== null && _a !== void 0 ? _a : "black";
+}
 // fill the textbox with a grid of divs
 newDocument(textBox, documentWidth, documentHeight);
 var defKeyWord = "define ";
@@ -91,8 +97,8 @@ function printExpression(expr) {
 // requires string to fit in row
 function printString(str, row, x, color) {
     for (var i = 0; i < str.length; i++) {
-        setCharAt(row, x + i, str[i]);
         setTextColorAt(row, x + i, color);
+        setCharAt(row, x + i, str[i]);
     }
 }
 function setTextColorAt(row, x, color) {
@@ -167,13 +173,13 @@ function escapeInsertMode(selection) {
 // -->
 // mode = command
 // define [myfunction]
-function selectParentOfLetter(cursor) {
-    if (cursor.parent === null) {
-        return { mode: "command", selection: cursor };
+function selectParentOfLetter(char) {
+    // if char is just a blank cursor, we want to delete it
+    var newSelection = char.parent;
+    if (char.content == " ") {
+        deleteNode(char);
     }
-    else {
-        return { mode: "command", selection: cursor.parent };
-    }
+    return { mode: "command", selection: newSelection };
 }
 // make a grid of divs with each one containing a space
 // appends the grid to textBox div
@@ -246,43 +252,29 @@ function unhighlightAt(row, x) {
     }
 }
 // add blank def to document
-// this version assumes that no position info is stored in the tree
 // document is selected
 // create a blank def, add that def to the document,
 // add a child cursor node to def.name
 // de-select document node
 // mark that cursor node as being selected (in some way)
-// render the blank def:
-// print "define " to (0,0)
-// highlight (0, defKeyWord.length)
 function addBlankDef(document) {
-    // creating a default blank def
-    // adding it to document
-    // selecting def.name
-    // adding child cursor to def.name
-    // selecting cursor
     // create a blank def, add that def to the document,
+    var blankDef = addBlankDefToModule(document);
+    // create a blank name, add that name to the def,
+    var blankName = addBlankNameToDef(blankDef);
+    // add a child cursor node to blankName
+    var cursor = addCursorToEndOfWord(blankName);
+    return { mode: "insert", selection: cursor };
+}
+function addBlankDefToModule(mod) {
     var blankDef = {
         kind: "definition",
-        parent: document,
+        parent: mod,
         name: null,
         parameters: []
     };
-    document.contents.push(blankDef);
-    var blankName = {
-        kind: "defName",
-        parent: blankDef,
-        content: [],
-    };
-    blankDef.name = blankName;
-    // add a child cursor node to def.name
-    var cursor = {
-        kind: "letter",
-        parent: blankDef.name,
-        content: " "
-    };
-    blankDef.name.content.push(cursor);
-    return { mode: "insert", selection: cursor };
+    mod.contents.push(blankDef);
+    return blankDef;
 }
 // prints the first def child of mod
 // doesn't highlight any children, even if they are selected
@@ -297,7 +289,7 @@ function printModule(mod, selectedNode) {
 // if they are, highlights them,
 function printDef(def, selectedNode) {
     clearDisplay(documentHeight, documentWidth);
-    printString(defKeyWord, 0, 0, defKeyWordColor);
+    printString(defKeyWord, 0, 0, getColor("defKeyword"));
     var name = {
         kind: "defName",
         parent: def,
@@ -324,13 +316,9 @@ function printListOfWords(words, row, x, selectedNode) {
         position = position + word.content.length + 1;
     });
 }
-var colorTable = new Map();
-colorTable.set("defName", "red");
-colorTable.set("parameter", "blue");
-colorTable.set("defKeyWord", "green");
 // prints word and highlights any selected letters
 function printWord(word, row, x, selectedNode) {
-    var color = colorTable.get(word.kind);
+    var color = getColor(word.kind);
     for (var i = 0; i < word.content.length; i++) {
         if (word.content[i] === selectedNode) {
             highlightAt(row, x + i);
@@ -383,12 +371,7 @@ function isAtEndOfWord(cursor) {
     return isLast;
 }
 function isNameOfSomeDef(myWord) {
-    if (myWord.parent.kind === "definition") {
-        return myWord.parent.name === myWord;
-    }
-    else {
-        return false;
-    }
+    return myWord.kind === "defName";
 }
 // is cursor the last letter in a name of a definition
 function isAtEndOfDefName(cursor) {
@@ -402,8 +385,22 @@ function deleteNode(node) {
         var i = getIndexInList(node);
         node.parent.content.splice(i, 1);
     }
+    else if (node.kind === "defName") {
+        var def = node.parent;
+        // set defname to blank name
+        var blankName = addBlankNameToDef(def);
+        addCursorToEndOfWord(blankName);
+    }
 }
-var defArgColor = "green";
+function addBlankNameToDef(def) {
+    var blankName = {
+        kind: "defName",
+        content: [],
+        parent: def
+    };
+    def.name = blankName;
+    return blankName;
+}
 function insertSpace(cursor) {
     // if cursor is at end of definition name
     // delete cursor node
