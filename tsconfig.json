@@ -3,7 +3,6 @@
         "noImplicitAny": true,
         "noImplicitReturns": true,
         "noPropertyAccessFromIndexSignature": true,
-        "strict": true
+        "strict": true,
     }
-    
 }

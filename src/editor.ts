@@ -9,13 +9,72 @@ textBox.classList.add("textBox");
 let commandTable = document.createElement("div");
 container.appendChild(commandTable);
 commandTable.classList.add("commandTable");
-commandTable.textContent = "Commands";
 
-// get the number of lines that the displayed node takes up from local storage
-// use that number to determine how many lines the textbox should have
-let storedSize = localStorage.getItem("displayed-node-size") ?? "300";
-let documentHeight = Math.max(300, parseInt(storedSize));
-let documentWidth = 100;
+let commandMap = new Map();
+
+// every function in the command map has to be type
+// selection --> info
+commandMap.set("f", addBlankDef);
+commandMap.set("p", selectParentOfLetter);
+
+
+let insertMap = new Map();
+// every function in insert map needs to be type
+// selection --> { mode, selection} : info
+insertMap.set("Backspace", backSpace);
+insertMap.set("Tab", doNothing);
+insertMap.set("Control", doNothing);
+insertMap.set("Alt" , doNothing);
+insertMap.set("Meta", doNothing);
+insertMap.set("ArrowUp", doNothing);
+insertMap.set("ArrowLeft", doNothing);
+insertMap.set("ArrowRight", doNothing);
+insertMap.set("ArrowDown", doNothing);
+insertMap.set(" ", insertSpace);
+insertMap.set("Enter", doNothing);
+
+insertMap.set(";", escapeInsertMode);
+
+// commandtable: has a row for mode
+// has a row for each command
+
+
+
+// for each (key, value) pair in command map
+// add a row to command table: row.textContent = key + " " + value
+function makeCommandTable() {
+    let modeDisplay = document.createElement("div");
+    commandTable.appendChild(modeDisplay);
+    modeDisplay.classList.add("tableRow");
+    modeDisplay.textContent = "mode:  command";
+
+    commandMap.forEach((value, key) => {
+        let row = document.createElement("div");
+        row.classList.add("tableRow");
+        row.textContent = `${key}     ${value.name}`;
+        commandTable.appendChild(row);
+
+    })
+}
+
+let insertTable = document.createElement("div");
+insertTable.classList.add("commandTable");
+
+
+function makeInsertTable() {
+    insertMap.forEach((value, key) => {
+        let row = document.createElement("div");
+        row.classList.add("tableRow");
+        row.textContent = `${key}    ${value.name}`;
+        insertTable.appendChild(row);
+    })
+}
+
+makeCommandTable();
+makeInsertTable();
+
+let documentHeight = 300;
+let documentWidth = 80;
 
 type nodeType = "defName" | "parameter" | "defKeyword";
 type color = "red" | "blue" | "green" | "black";
@@ -68,10 +127,6 @@ type module = {
     contents: definition[];
 }
 
-// constructors: (could turn some of these types into classes)
-
-
-
 // expression could be a generic type that takes children's type as input
 // letter = expression string
 // word = expression letter
@@ -101,8 +156,6 @@ let state : info = {
     selection: documentNode
 }
 
-
-
 document.addEventListener("keydown", main);
 
 // clear the display of all text and highlighting
@@ -117,11 +170,10 @@ function clearDisplay(documentHeight : number, documentWidth : number) {
 
 }
 
-// testUIfunctions();
+testUIfunctions();
 
 function testUIfunctions() {
-    setTextColorAt(0, 0, "red");
-    setCharAt(0,0, "a");
+    console.log(commandMap.get("f").name);
 }
 // this is the main entry point for the editor program
 function main(e : KeyboardEvent) {
@@ -132,6 +184,20 @@ function main(e : KeyboardEvent) {
     state = handleInput(key, state);
     // update the ui:
     printModule(documentNode, state.selection);
+    updateTable(state.mode);
+}
+
+function updateTable(currentMode : mode) {
+    // remove current table from ui without getting rid of its info
+    let currentTable = document.getElementsByClassName("commandTable")[0];
+    container.removeChild(currentTable);
+    
+    if (currentMode === "insert") {
+        container.appendChild(insertTable);
+    }
+    else if (currentMode === "command") {
+        container.appendChild(commandTable);
+    }
 }
 
 function handleInput(key : string, state : info) : info {
@@ -144,31 +210,6 @@ function handleInput(key : string, state : info) : info {
     }
     return newState;
 }
-
-let commandMap = new Map();
-
-// every function in the command map has to be type
-// selection --> info
-commandMap.set("f", addBlankDef);
-commandMap.set("p", selectParentOfLetter);
-
-
-let insertMap = new Map();
-// every function in insert map needs to be type
-// selection --> { mode, selection} : info
-insertMap.set("Backspace", backSpace);
-insertMap.set("Tab", doNothing);
-insertMap.set("Control", doNothing);
-insertMap.set("Alt" , doNothing);
-insertMap.set("Meta", doNothing);
-insertMap.set("ArrowUp", doNothing);
-insertMap.set("ArrowLeft", doNothing);
-insertMap.set("ArrowRight", doNothing);
-insertMap.set("ArrowDown", doNothing);
-insertMap.set(" ", insertSpace);
-insertMap.set("Enter", doNothing);
-
-insertMap.set(";", escapeInsertMode);
 
 
 
@@ -681,3 +722,10 @@ function isArgOfSomeDef(myWord : word) : boolean {
 // defarg type
 // defbody type
 
+// define numbers
+// define arithmetic functions
+// choose some simple theorems
+// write a program that can prove them
+
+// TODO
+// display command table

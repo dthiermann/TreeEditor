@@ -1,5 +1,4 @@
 "use strict";
-var _a;
 var container = document.createElement("div");
 document.body.appendChild(container);
 container.classList.add("container");
@@ -9,12 +8,56 @@ textBox.classList.add("textBox");
 var commandTable = document.createElement("div");
 container.appendChild(commandTable);
 commandTable.classList.add("commandTable");
-commandTable.textContent = "Commands";
-// get the number of lines that the displayed node takes up from local storage
-// use that number to determine how many lines the textbox should have
-var storedSize = (_a = localStorage.getItem("displayed-node-size")) !== null && _a !== void 0 ? _a : "300";
-var documentHeight = Math.max(300, parseInt(storedSize));
-var documentWidth = 100;
+var commandMap = new Map();
+// every function in the command map has to be type
+// selection --> info
+commandMap.set("f", addBlankDef);
+commandMap.set("p", selectParentOfLetter);
+var insertMap = new Map();
+// every function in insert map needs to be type
+// selection --> { mode, selection} : info
+insertMap.set("Backspace", backSpace);
+insertMap.set("Tab", doNothing);
+insertMap.set("Control", doNothing);
+insertMap.set("Alt", doNothing);
+insertMap.set("Meta", doNothing);
+insertMap.set("ArrowUp", doNothing);
+insertMap.set("ArrowLeft", doNothing);
+insertMap.set("ArrowRight", doNothing);
+insertMap.set("ArrowDown", doNothing);
+insertMap.set(" ", insertSpace);
+insertMap.set("Enter", doNothing);
+insertMap.set(";", escapeInsertMode);
+// commandtable: has a row for mode
+// has a row for each command
+// for each (key, value) pair in command map
+// add a row to command table: row.textContent = key + " " + value
+function makeCommandTable() {
+    var modeDisplay = document.createElement("div");
+    commandTable.appendChild(modeDisplay);
+    modeDisplay.classList.add("tableRow");
+    modeDisplay.textContent = "mode:  command";
+    commandMap.forEach(function (value, key) {
+        var row = document.createElement("div");
+        row.classList.add("tableRow");
+        row.textContent = "".concat(key, "     ").concat(value.name);
+        commandTable.appendChild(row);
+    });
+}
+var insertTable = document.createElement("div");
+insertTable.classList.add("commandTable");
+function makeInsertTable() {
+    insertMap.forEach(function (value, key) {
+        var row = document.createElement("div");
+        row.classList.add("tableRow");
+        row.textContent = "".concat(key, "    ").concat(value.name);
+        insertTable.appendChild(row);
+    });
+}
+makeCommandTable();
+makeInsertTable();
+var documentHeight = 300;
+var documentWidth = 80;
 var colorTable = new Map();
 colorTable.set("defName", "red");
 colorTable.set("parameter", "blue");
@@ -46,10 +89,9 @@ function clearDisplay(documentHeight, documentWidth) {
         }
     }
 }
-// testUIfunctions();
+testUIfunctions();
 function testUIfunctions() {
-    setTextColorAt(0, 0, "red");
-    setCharAt(0, 0, "a");
+    console.log(commandMap.get("f").name);
 }
 // this is the main entry point for the editor program
 function main(e) {
@@ -60,6 +102,18 @@ function main(e) {
     state = handleInput(key, state);
     // update the ui:
     printModule(documentNode, state.selection);
+    updateTable(state.mode);
+}
+function updateTable(currentMode) {
+    // remove current table from ui without getting rid of its info
+    var currentTable = document.getElementsByClassName("commandTable")[0];
+    container.removeChild(currentTable);
+    if (currentMode === "insert") {
+        container.appendChild(insertTable);
+    }
+    else if (currentMode === "command") {
+        container.appendChild(commandTable);
+    }
 }
 function handleInput(key, state) {
     var newState = state;
@@ -71,26 +125,6 @@ function handleInput(key, state) {
     }
     return newState;
 }
-var commandMap = new Map();
-// every function in the command map has to be type
-// selection --> info
-commandMap.set("f", addBlankDef);
-commandMap.set("p", selectParentOfLetter);
-var insertMap = new Map();
-// every function in insert map needs to be type
-// selection --> { mode, selection} : info
-insertMap.set("Backspace", backSpace);
-insertMap.set("Tab", doNothing);
-insertMap.set("Control", doNothing);
-insertMap.set("Alt", doNothing);
-insertMap.set("Meta", doNothing);
-insertMap.set("ArrowUp", doNothing);
-insertMap.set("ArrowLeft", doNothing);
-insertMap.set("ArrowRight", doNothing);
-insertMap.set("ArrowDown", doNothing);
-insertMap.set(" ", insertSpace);
-insertMap.set("Enter", doNothing);
-insertMap.set(";", escapeInsertMode);
 function printExpression(expr) {
 }
 // print String to the ui directly
@@ -498,3 +532,9 @@ function isArgOfSomeDef(myWord) {
 // defname type
 // defarg type
 // defbody type
+// define numbers
+// define arithmetic functions
+// choose some simple theorems
+// write a program that can prove them
+// TODO
+// display command table
