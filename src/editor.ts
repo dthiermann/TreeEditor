@@ -10,17 +10,23 @@ let commandTable = document.createElement("div");
 container.appendChild(commandTable);
 commandTable.classList.add("commandTable");
 
+
+// eventually, commandMap and insertMap will have type
+// Map<string, info => info >
+// or possibly
+// Map<string, sel : expr --> expr >
+// currently, code assumes Map<string, sel : expression -> info >
 let commandMap = new Map();
 
-// every function in the command map has to be type
-// selection --> info
 commandMap.set("f", addBlankDef);
 commandMap.set("p", selectParentOfLetter);
+commandMap.set("i", enterInsertMode);
+commandMap.set("j", selectLeftSibling);
+commandMap.set("k", selectRightSibling);
 
 
 let insertMap = new Map();
-// every function in insert map needs to be type
-// selection --> { mode, selection} : info
+
 insertMap.set("Backspace", backSpace);
 insertMap.set("Tab", doNothing);
 insertMap.set("Control", doNothing);
@@ -35,9 +41,9 @@ insertMap.set("Enter", doNothing);
 
 insertMap.set(";", escapeInsertMode);
 
-// commandtable: has a row for mode
-// has a row for each command
-
+function enterInsertMode(selection : expression) : info {
+    return {mode: "insert", selection: selection};
+}
 
 
 // for each (key, value) pair in command map
@@ -605,7 +611,7 @@ function insertSpace(cursor : letter) : info {
     // add a new argument to the front of argument list
     // make cursor node be the child of new argument
 
-    if (isAtEndOfDefName(cursor) && cursor.parent.parent.kind === "definition") {
+    if (isAtEndOfDefName(cursor) && cursor.parent.kind === "defName") {
         let def = cursor.parent.parent;
         deleteNode(cursor);
         let newArg : parameter = {
@@ -653,79 +659,80 @@ function isArgOfSomeDef(myWord : word) : boolean {
 }
 
 
+// if node has a rightSibling, return it,
+// otherwise return original node
+// not implemented for modules or defs yet
+function getRightSibling(node : expression) : expression {
+    if (node.kind === "defName") {
+        return node.parent.parameters[0];
+    }
+    else if (node.kind === "parameter") {
+        let i = getIndexInList(node);
+        let parameters = node.parent.parameters;
+        if (i < parameters.length - 1) {
+            return node.parent.parameters[i + 1];
+        }
+        else {
+            return node;
+        }
+    }
+    else if (node.kind === "letter") {
+        let i = getIndexInList(node);
+        let letterList = node.parent.content;
+        if (i < letterList.length - 1) {
+            return letterList[i+1];
+        }
+        else {
+            return node;
+        }
+    }
+    else {
+        return node;
+    }
+}
+
+// get Left Sibling if node has one
+function getLeftSibling(node : expression) : expression {
+    if (node.kind === "defName") {
+        return node;
+    }
+    else if (node.kind === "parameter") {
+        let i = getIndexInList(node);
+        let parameters = node.parent.parameters;
+        if (i > 0) {
+            return node.parent.parameters[i - 1];
+        }
+        else {
+            return node.parent.name ?? node;
+        }
+    }
+    else if (node.kind === "letter") {
+        let i = getIndexInList(node);
+        let letterList = node.parent.content;
+        if (i > 0) {
+            return letterList[i - 1];
+        }
+        else {
+            return node;
+        }
+    }
+    else {
+        return node;
+    }
+}
+
+function selectRightSibling(selection : expression) : info {
+    let rightSibling = getRightSibling(selection);
+    return { mode: "command", selection: rightSibling};
+
+}
+
+function selectLeftSibling(selection : expression) : info {
+    let leftSibling = getLeftSibling(selection);
+    return { mode: "command", selection: leftSibling }
+}
 
 
-// has right sibling
-// has left sibling
-// get right sibling
-// get left sibling
+function insertBlankRightSibling(selection : expression)  {
 
-// inserting nodes
-// first you make the newNode or get a ref to it
-// then you have an insert newNode relativePosition existingNode
-
-// syntax highlighting
-// words should store identifiers like "defname" "defarg" "defKeyWord"
-// these will determine the text color
-// for getting siblings of nodes, could keep a list [name, args, body]
-// if the attributes are not ordered (like name, args, body),
-// then it makes sense to not navigate like siblings
-// instead have keys that directly select name, args, or body,
-
-
-// define natural
-//   zero or (s natural)
-
-// basic tree motions
-// select parent
-// select left sibling
-// select right sibling
-// select first child
-
-// create cursor node
-// set cursor node to a specific value
-// create empty word node
-// delete node
-// insert node in first child position
-// insert node in last child position
-
-// moving from defname to body:
-// select parent (kind defname)
-// select parent (def)
-// select def.body : list statements
-// create new blank statement
-// insert blank statement as first child of def.body
-// create newword node
-// insert word node as first child of statement
-// create new cursor node
-// insert cursor node as first child of word
-
-// composing actions
-// (mode, selection, tree) + key --> (newMode, newSelection, newTree)
-// but tree is actually modified in place
-// actions depend on (mode, selectionType, key)
-// so could have one table where the keys are (mode, selectionType, key)
-// and the values are the action functions
-// selectionTypes = letter, defname, defArg, defArgList, defBody, def, statement/expression,
-// word = defname | defArg | ...
-// could keep def children all in one list, to make it easier to implement sibling movement
-
-// (mode, selection, selectionType) + key --> (newMode, newSelection)
-// most commands : selection -> selection  (side effect: tree changes)
-// mode switch commands:
-// insert -> command (may also change the selection)
-// command -> insert (may also change the selection)
-
-// make types more specific?
-// cursor type
-// defname type
-// defarg type
-// defbody type
-
-// define numbers
-// define arithmetic functions
-// choose some simple theorems
-// write a program that can prove them
-
-// TODO
-// display command table
+}
