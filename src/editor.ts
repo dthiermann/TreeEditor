@@ -176,10 +176,16 @@ function clearDisplay(documentHeight : number, documentWidth : number) {
 
 }
 
-testUIfunctions();
+// testfunctions();
 
-function testUIfunctions() {
-    console.log(commandMap.get("f").name);
+function testfunctions() {
+    let sample = [1,2,3];
+    sample.splice(3, 0, 4);
+    console.log(sample);
+    sample.splice(4, 0, 5);
+    console.log(sample);
+    sample.splice(5, 0, 6);
+    console.log(sample);
 }
 // this is the main entry point for the editor program
 function main(e : KeyboardEvent) {
@@ -545,21 +551,26 @@ function backSpace(cursor : letter) : info {
 }
 
 // for a node in a list, get its index
-function getIndexInList(child : letter | word) : number {
-    let parent = child.parent;
-    let index = 0;
-    if (parent.kind === "definition") {
-        return 0;
+// every letter is in a word which has a list of letters
+// every parameter is in a list of parameters
+function getIndexInList(child : letter | parameter) : number {
+    if (child.kind === "letter") {
+        return getLetterList(child).indexOf(child);
+    }
+    if (child.kind === "parameter") {
+        return getParameterList(child).indexOf(child);
     }
     else {
-        for (let i = 0; i < parent.content.length; i++) {
-            if (parent.content[i] === child) {
-                index = i;
-            }
-        }
-        return index;
+        return -1;
     }
-    
+}
+
+function getLetterList(child: letter) : letter[] {
+    return child.parent.content;
+}
+
+function getParameterList(child: parameter) : parameter[] {
+    return child.parent.parameters;
 }
 
 function isAtEndOfWord(cursor : letter) : boolean {
@@ -633,14 +644,25 @@ function insertSpace(cursor : letter) : info {
         return { mode: "insert", selection: newCursor};
 
     }
-    else if (isAtEndOfArg(cursor)) {
+    else if (cursor.parent.kind === "parameter") {
         // delete cursor node
         // insert a new blank argument to the right
         // add a cursor node child to this argument
+        let parameter = cursor.parent;
+        let def = parameter.parent;
+        let parameterList = def.parameters;
         deleteNode(cursor);
-        let args = cursor.parent;
+        let i = parameterList.indexOf(parameter);
+        let newParameter : parameter = {
+            kind: "parameter",
+            parent: def,
+            content: []
+        }
+        parameterList.splice(i + 1, 0, newParameter);
         
-        
+
+        let newCursor = addCursorToEndOfWord(newParameter);
+        return { mode: "insert", selection: newCursor};
 
     }
     return { mode: "insert", selection: cursor};
@@ -734,5 +756,10 @@ function selectLeftSibling(selection : expression) : info {
 
 
 function insertBlankRightSibling(selection : expression)  {
+    if (selection.kind === "defName") {
+        // add new parameter to start of parameter list
 
+
+    }
 }
+

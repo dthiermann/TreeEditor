@@ -94,9 +94,15 @@ function clearDisplay(documentHeight, documentWidth) {
         }
     }
 }
-testUIfunctions();
-function testUIfunctions() {
-    console.log(commandMap.get("f").name);
+// testfunctions();
+function testfunctions() {
+    var sample = [1, 2, 3];
+    sample.splice(3, 0, 4);
+    console.log(sample);
+    sample.splice(4, 0, 5);
+    console.log(sample);
+    sample.splice(5, 0, 6);
+    console.log(sample);
 }
 // this is the main entry point for the editor program
 function main(e) {
@@ -389,20 +395,24 @@ function backSpace(cursor) {
     return { mode: "insert", selection: leftSibling };
 }
 // for a node in a list, get its index
+// every letter is in a word which has a list of letters
+// every parameter is in a list of parameters
 function getIndexInList(child) {
-    var parent = child.parent;
-    var index = 0;
-    if (parent.kind === "definition") {
-        return 0;
+    if (child.kind === "letter") {
+        return getLetterList(child).indexOf(child);
+    }
+    if (child.kind === "parameter") {
+        return getParameterList(child).indexOf(child);
     }
     else {
-        for (var i = 0; i < parent.content.length; i++) {
-            if (parent.content[i] === child) {
-                index = i;
-            }
-        }
-        return index;
+        return -1;
     }
+}
+function getLetterList(child) {
+    return child.parent.content;
+}
+function getParameterList(child) {
+    return child.parent.parameters;
 }
 function isAtEndOfWord(cursor) {
     var word = cursor.parent;
@@ -462,12 +472,24 @@ function insertSpace(cursor) {
         newArg.content.push(newCursor);
         return { mode: "insert", selection: newCursor };
     }
-    else if (isAtEndOfArg(cursor)) {
+    else if (cursor.parent.kind === "parameter") {
         // delete cursor node
         // insert a new blank argument to the right
         // add a cursor node child to this argument
+        var parameter = cursor.parent;
+        var def = parameter.parent;
+        var parameterList = def.parameters;
         deleteNode(cursor);
-        var args = cursor.parent;
+        var i = parameterList.indexOf(parameter);
+        console.log("i = ", i);
+        var newParameter = {
+            kind: "parameter",
+            parent: def,
+            content: []
+        };
+        parameterList.splice(i + 1, 0, newParameter);
+        var newCursor = addCursorToEndOfWord(newParameter);
+        return { mode: "insert", selection: newCursor };
     }
     return { mode: "insert", selection: cursor };
 }
@@ -551,4 +573,12 @@ function selectLeftSibling(selection) {
     return { mode: "command", selection: leftSibling };
 }
 function insertBlankRightSibling(selection) {
+    if (selection.kind === "defName") {
+        // add new parameter to start of parameter list
+    }
 }
+// flat structure:
+// def = [name, parameters, body ]
+// [a, b, c, d]
+// get right sibling of b (assuming we have a ref to b)
+// in C, this would just be incrementing the pointer / index
