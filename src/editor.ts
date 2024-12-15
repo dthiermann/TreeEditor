@@ -19,7 +19,7 @@ commandTable.classList.add("commandTable");
 let commandMap = new Map();
 
 commandMap.set("f", addBlankDef);
-commandMap.set("p", selectParentOfLetter);
+commandMap.set("p", selectParent);
 commandMap.set("i", enterInsertMode);
 commandMap.set("j", selectLeftSibling);
 commandMap.set("k", selectRightSibling);
@@ -36,7 +36,7 @@ insertMap.set("ArrowUp", doNothing);
 insertMap.set("ArrowLeft", doNothing);
 insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
-insertMap.set(" ", insertSpace);
+insertMap.set(" ", doNothing);
 insertMap.set("Enter", doNothing);
 
 insertMap.set(";", escapeInsertMode);
@@ -127,6 +127,9 @@ type definition = {
     body?: expression[];
     parent: module;
 }
+
+// sum n (s m) = s (sum n m)
+// right side: application ( constructor , application (name parameter parameter))
 
 type module = {
     kind: "module";
@@ -224,9 +227,6 @@ function handleInput(key : string, state : info) : info {
 }
 
 
-
-
-
 function printExpression(expr : expression) {
     
 }
@@ -268,7 +268,7 @@ function commandMode(key : string, selection : expression) : info {
 
 // handles user input when in insert mode
 function insertMode(key : string, selection : expression) : info {
-    // if key is not a letter or number, it should have an entry in the insertMap
+    // if key is not a letter or number, it should have an entry in insertMap
     if (insertMap.has(key)) {
         return insertMap.get(key)(selection);
     }
@@ -277,29 +277,46 @@ function insertMode(key : string, selection : expression) : info {
     }
 }
 
+// if selection is a letter, insert after the letter
+// if selection is a word, delete the content of the word and replace it with key
 function insertAtSelectionInTree(key : string, selection : expression) : info {
     if (selection.kind === "letter") {
-        return insertAtCursorInTree(key, selection);
+        return insertAtLetterInTree(key, selection);
     }
-    else {
-        return {mode: "insert", selection: selection};
+    if (selection.kind === "defName") {
+        let newLetter : letter = {
+            kind: "letter",
+            parent: selection,
+            content: key,
+        }
+        selection.content = [newLetter];
+        
     }
+    if (selection.kind === "parameter") {
+        let newLetter : letter = {
+            kind: "letter",
+            parent: selection,
+            content: key,
+        }
+        selection.content = [newLetter];
+    }
+    return {mode: "insert", selection: selection};
 
 }
 
-// assuming selection is a single empty space (cursor)
-function insertAtCursorInTree(key : string, cursor : letter) : info {
-    // decompose into steps:
-    // at cursor location, set letter value to key
-    // create a new cursor 
-    cursor.content = key;
-
-    // tree: add a new blank cursor to the right of selectedNode
-    let parentWord = cursor.parent;
-
-    let newCursor = addCursorToEndOfWord(parentWord);
-    
-    return { mode: "insert", selection: newCursor };
+// no more empty cursors
+// when key is a letter and selection is a letter
+// we are adding key right after selection and before the rest of the word
+function insertAtLetterInTree(key : string, selection : letter) : info {
+    let word = selection.parent;
+    let i = getIndexInList(selection);
+    let newLetter : letter = {
+        kind: "letter",
+        parent: word,
+        content: key
+    }
+    word.content.splice(i+1, 0, newLetter);
+    return {mode: "insert", selection: newLetter};
 }
 
 // adds cursor (blank space letter node) as last child of word
@@ -327,21 +344,6 @@ let shiftMap = new Map();
 function escapeInsertMode(selection : expression) : info {
     return { mode: "command", selection: selection };
 }
-
-// mode = command
-// text = define myfunction_
-// -->
-// mode = command
-// define [myfunction]
-function selectParentOfLetter(char : letter) : info {
-    // if char is just a blank cursor, we want to delete it
-    let newSelection = char.parent
-    if (char.content == " ") {
-        deleteNode(char);
-    }
-    return { mode: "command", selection: newSelection };
-}
-  
 
 // make a grid of divs with each one containing a space
 // appends the grid to textBox div
@@ -438,10 +440,8 @@ function addBlankDef(document : module) : info {
     // create a blank name, add that name to the def,
     let blankName = addBlankNameToDef(blankDef);
 
-    // add a child cursor node to blankName
-    let cursor = addCursorToEndOfWord(blankName);
-
-    return {mode: "insert", selection: cursor };
+    // select the name
+    return {mode: "insert", selection: blankName };
 
 }
 
@@ -459,7 +459,7 @@ function addBlankDefToModule(mod : module) : definition {
 // prints the first def child of mod
 // doesn't highlight any children, even if they are selected
 function printModule(mod : module, selectedNode : expression) {
-    if (mod.contents[0] === null) {
+    if (mod.contents.length == 0) {
 
     }
     else {
@@ -494,6 +494,7 @@ function printDef(def : definition, selectedNode : expression) {
 }
 
 // should print a list of words on one line, separating them by spaces
+// if word is empty, should give it a space
 function printListOfWords(words : word[], row: number, x: number, selectedNode : expression) {
     let position = x;
     words.forEach(word => {
@@ -503,13 +504,15 @@ function printListOfWords(words : word[], row: number, x: number, selectedNode :
         else {
             printWord(word, row, position, selectedNode);
         }
-        position = position + word.content.length + 1;
+
+        let printingLength = Math.max(1, word.content.length);
+        position = position + printingLength + 1;
     })
 }
 
 
-
 // prints word and highlights any selected letters
+// empty words should be printed as " "
 function printWord(word : word, row : number, x : number, selectedNode : expression) {
     let color = getColor(word.kind);
     for (let i = 0; i < word.content.length; i ++) {
@@ -525,29 +528,31 @@ function printWord(word : word, row : number, x : number, selectedNode : express
 
 // prints and highlights entire word
 function printAndHighlightWord(word : word, row : number, x : number) {
+    if (word.content.length == 0) {
+        highlightAt(row, x);
+    }
     for (let i = 0; i < word.content.length; i ++) {
         setCharAt(row, x + i, word.content[i].content);
         highlightAt(row, x + i);
     }
 }
 
-// define sum f_
+// define sum nam
 // -->
-// define sum _
-function backSpace(cursor : letter) : info {
-    // if cursor has a left sibling, we want to get it
-    let i = getIndexInList(cursor) - 1;
-    let word = cursor.parent;
-    let leftSibling = word.content[i];
+// define sum na
+function backSpace(selection : letter) : info {
 
-    // delete the letter before cursor
-    leftSibling.content = " ";
-
-    // remove the old cursor node from the tree
-    word.content.splice(i + 1, 1);
-
-    // change the selection to left sibling
-    return {mode : "insert", selection : leftSibling};
+    // remove the selected letter from end of parent word
+    selection.parent.content.pop();
+    // if there are letters remaining in the word, the selection becomes the prev letter
+    // otherwise, select the empty word
+    if (selection.parent.content.length > 0) {
+        return {mode: "insert", selection: getLeftSibling(selection)};
+    }
+    else {
+        return {mode: "insert", selection: selection.parent};
+    }
+    
 }
 
 // for a node in a list, get its index
@@ -589,23 +594,6 @@ function isAtEndOfDefName(cursor : letter) : boolean {
     return isNameOfSomeDef(word) && isAtEndOfWord(cursor);
 }
 
-// removes node from parent's list of children
-// hopefully gets garbage collected
-function deleteNode(node : expression) {
-    if (node.kind === "letter") {
-        let i = getIndexInList(node);
-        node.parent.content.splice(i, 1);
-
-    }
-    else if (node.kind === "defName") {
-        let def = node.parent;
-        // set defname to blank name
-        let blankName = addBlankNameToDef(def);
-        addCursorToEndOfWord(blankName);
-
-    }
-}
-
 function addBlankNameToDef(def : definition) : defName {
     let blankName : defName = {
         kind: "defName",
@@ -616,57 +604,7 @@ function addBlankNameToDef(def : definition) : defName {
     return blankName;
 }
 
-function insertSpace(cursor : letter) : info {
-    // if cursor is at end of definition name
-    // delete cursor node
-    // add a new argument to the front of argument list
-    // make cursor node be the child of new argument
 
-    if (isAtEndOfDefName(cursor) && cursor.parent.kind === "defName") {
-        let def = cursor.parent.parent;
-        deleteNode(cursor);
-        let newArg : parameter = {
-            kind: "parameter",
-            content: [],
-            parent: def,
-        }
-
-        def.parameters.unshift(newArg);
-
-        let newCursor : letter = {
-            kind: "letter",
-            content: " ",
-            parent: newArg,
-        }
-
-        newArg.content.push(newCursor);
-
-        return { mode: "insert", selection: newCursor};
-
-    }
-    else if (cursor.parent.kind === "parameter") {
-        // delete cursor node
-        // insert a new blank argument to the right
-        // add a cursor node child to this argument
-        let parameter = cursor.parent;
-        let def = parameter.parent;
-        let parameterList = def.parameters;
-        deleteNode(cursor);
-        let i = parameterList.indexOf(parameter);
-        let newParameter : parameter = {
-            kind: "parameter",
-            parent: def,
-            content: []
-        }
-        parameterList.splice(i + 1, 0, newParameter);
-        
-
-        let newCursor = addCursorToEndOfWord(newParameter);
-        return { mode: "insert", selection: newCursor};
-
-    }
-    return { mode: "insert", selection: cursor};
-}
 
 // checks to see if cursor is at the end of one of the arguments in definition
 // Ex: define myfunc hello_ there --> true
@@ -763,3 +701,65 @@ function insertBlankRightSibling(selection : expression)  {
     }
 }
 
+// to navigate using the current tree system
+// you can go to parents, and children
+
+// 
+// natural = union zero (s natural)
+// sum n zero = n
+// sum n (s m) = s (sum n m)
+
+// typing sum --> building a defName
+// typing words after sum --> adding parameters
+// typing = --> moving to the body of the def
+
+// different ways of doing the same thing:
+// writing definitions as universal statements that involve equality:
+// doesn't necessarily make it clear that this is how sum is defined
+// for all natural n, sum n zero = n
+// for all natural n, m, sum n (s m) = s (sum n m)
+
+// same as above, without explicitly declaring the parameters and their range
+// (becomes pattern matching)
+// sum n zero = n
+// sum n (s m) = s (sum n m)
+
+// explicitly a definition, with conditionals instead of patttern matching, 
+// define sum n m
+//   if (m = 0) n
+//   if 
+
+// it would be nice to represent these different forms with a single tree structure
+// sum n zero = n
+// sum n (s m) = s (sum n m)
+
+// sum -- name of a function
+// n, m   -- parameter or universally quantified variable (possibly restricted to natural numbers)
+// zero -- name of a constant value
+// s    -- name of a constructor :N -> N
+
+
+// sum n zero = n
+// equal (sum n zero) n
+
+// for-all natural n (equal (sum n zero) n)
+// for-all set parameter statement
+// sum : N -> N -> N
+// equal: N -> N -> bool
+// or equal: N -> N -> statement
+
+// select parent
+// if module is selected, changes nothing
+function selectParent(selection : expression) : info {
+    if (selection.kind === "module") {
+        return {mode: "command", selection: selection};
+    }
+    else {
+        return {mode: "command", selection: selection.parent};
+    }
+}
+
+// add new statement to the beginning of def body
+function addNewStatementToBody(selection : expression) {
+    
+}
