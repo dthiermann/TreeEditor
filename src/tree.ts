@@ -35,6 +35,48 @@ export type module = {
 
 export type expression = letter | word | definition | module;
 
+// constructors for blank expressions
+// (should probably turn each expression type into a class)
+
+// make a new blank def name and set parent's name to it
+function makeBlankDefName(parent : definition) : defName {
+    let blankDefName : defName = {
+        kind: "defName",
+        content: [],
+        parent: parent
+    }
+    parent.name = blankDefName;
+    return blankDefName;
+}
+
+// create a new blank paramater, add it before the kth parameter, and return it,
+function makeBlankParameter(index : number, parent : definition) : parameter {
+    let blankParameter : parameter = {
+        kind: "parameter",
+        content: [],
+        parent: parent
+    }
+    parent.parameters.splice(index, 0, blankParameter);
+    return blankParameter;
+}
+
+// add letter to parent word before letter at index
+// example:
+// index = 2
+// word = "help"
+// word[2] = "l"
+// adding k at index 2 means
+// word = "heklp"
+function addLetterBefore(key : string, index : number, parent : word) {
+    let newLetter : letter = {
+        kind: "letter",
+        parent: parent,
+        content: key
+    }
+    parent.content.splice(index, 0, newLetter);
+    
+}
+
 // eventually, commandMap and insertMap will have type
 // Map<string, info => info >
 // or possibly
@@ -47,6 +89,7 @@ commandMap.set("p", selectParent);
 commandMap.set("i", enterInsertMode);
 commandMap.set("j", selectLeftSibling);
 commandMap.set("k", selectRightSibling);
+commandMap.set("r", selectDefName);
 
 
 export let insertMap = new Map();
@@ -60,7 +103,7 @@ insertMap.set("ArrowUp", doNothing);
 insertMap.set("ArrowLeft", doNothing);
 insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
-insertMap.set(" ", doNothing);
+insertMap.set(" ", insertSpace);
 insertMap.set("Enter", doNothing);
 
 insertMap.set(";", escapeInsertMode);
@@ -143,22 +186,28 @@ function addBlankDefToModule(mod : module) : definition {
     return blankDef;
 }
 
-// define sum nam
-// -->
-// define sum na
-function backSpace(selection : letter) : info {
-
-    // remove the selected letter from end of parent word
-    selection.parent.content.pop();
-    // if there are letters remaining in the word, the selection becomes the prev letter
-    // otherwise, select the empty word
-    if (selection.parent.content.length > 0) {
-        return {mode: "insert", selection: getLeftSibling(selection)};
+// nam[e] --> na[m]
+// he[a]p --> h[e]p
+// [n] --> empty word, (selection is the empty word)
+function backSpace(selection : letter | defName | parameter) : info {
+    if (selection.kind === "letter") {
+        // let i = index of selected letter in word
+        let i = getIndexInList(selection);
+        let newSelection = getLeftSibling(selection);
+        // removing word[i] from word
+        selection.parent.content.splice(i, 1);
+        // if there are letters remaining in the word, the selection becomes the prev letter
+        // otherwise, select the empty word
+        if (selection.parent.content.length > 0) {
+            return {mode: "insert", selection: newSelection};
+        }
+        else {
+            return {mode: "insert", selection: selection.parent};
+        }
     }
-    else {
-        return {mode: "insert", selection: selection.parent};
+    else if (selection.kind === "defName") {
+        
     }
-    
 }
 
 // for a node in a list, get its index
@@ -203,7 +252,19 @@ function addBlankNameToDef(def : definition) : defName {
 // not implemented for modules or defs yet
 function getRightSibling(node : expression) : expression {
     if (node.kind === "defName") {
-        return node.parent.parameters[0];
+        if (node.parent.parameters.length == 0) {
+            let emptyParam : parameter = {
+                kind: "parameter",
+                content: [],
+                parent: node.parent
+            }
+            node.parent.parameters.push(emptyParam);
+            return emptyParam;
+        }
+        else {
+            return node.parent.parameters[0];
+        }
+    
     }
     else if (node.kind === "parameter") {
         let i = getIndexInList(node);
@@ -312,3 +373,56 @@ function enterInsertMode(selection : expression) : info {
 function doNothing(selection : expression) {
     return true;
 }
+
+// from def, select name
+function selectDefName(def : definition): info {
+    if (def.name === null) {
+        return {mode: "command", selection: def};
+    }
+    else {
+        return {mode: "command", selection: def.name};
+    }
+}
+
+// def nam[e]
+// press space
+// def name []
+function insertSpace(selection : letter) : info {
+    if (selection.parent.kind === "defName") {
+        let def = selection.parent.parent;
+        let newParam : parameter = {
+            kind: "parameter",
+            content: [],
+            parent: def
+        }
+        def.parameters.unshift(newParam);
+        return {mode: "insert", selection: newParam};
+    }
+    else if (selection.parent.kind === "parameter") {
+        let def = selection.parent.parent;
+        let i = getIndexInList(selection.parent);
+        let parameters = selection.parent.parent.parameters;
+        let additionalParam : parameter = {
+            kind: "parameter",
+            content: [],
+            parent: def
+        }
+        parameters.splice(i+1, 0, additionalParam);
+        return {mode: "insert", selection: additionalParam};
+    }
+    else {
+        return {mode: "insert", selection: selection};
+    }
+}
+
+// define sum a _
+// backspace
+// leads to an error
+// want to change it to get
+// define sum [a]
+
+// if backspace is called when selection is an empty word
+// delete that empty word
+// select the previous word
+// prev word, means according to the order:
+// defname, param1, param2, param3 ..
