@@ -1,12 +1,23 @@
 import { info } from "./main"
 
+// what is the type system supposed to express
+// abstract syntax tree: how are things labelled?
+// what does interpreter need to know?
+// which things are names that are defined elsewhere and need to be looked up
+// which things are applications
+// Example:
+// a = f b
+// the whole line is a let-expr
+// a,f,b are names
+// f b  is an application
+
 export type letter = {
     kind: "letter";
     content: string;
     parent: word
 }
 
-export type word = defName | parameter
+export type word = defName | parameter | name
 
 export type defName = {
     kind: "defName";
@@ -23,17 +34,39 @@ export type definition = {
     kind: "definition";
     name: defName | null;
     parameters: parameter[];
-    body?: expression[];
+    body?: letExpr[];
     parent: module;
 }
 
+export type application = {
+    kind: "application";
+    function: application | name;
+    argument: application | name;
+    parent: letExpr;
+}
+
+// when printed, will look like
+// name = value
+export type letExpr = {
+    kind: "letExpr";
+    name: name;
+    value: application | name;
+    parent: definition;
+}
+
+
+export type name = {
+    kind: "name";
+    content: letter[];
+    parent: application | letExpr;
+}
 
 export type module = {
     kind: "module";
     contents: definition[];
 }
 
-export type expression = letter | word | definition | module;
+export type expression = letter | word | definition | application | module | letExpr;
 
 // constructors for blank expressions
 // (should probably turn each expression type into a class)
@@ -86,7 +119,6 @@ export let commandMap = new Map();
 
 commandMap.set("f", addBlankDef);
 commandMap.set("p", selectParent);
-commandMap.set("i", enterInsertMode);
 commandMap.set("j", selectLeftSibling);
 commandMap.set("k", selectRightSibling);
 commandMap.set("r", selectDefName);
@@ -106,7 +138,6 @@ insertMap.set("ArrowDown", doNothing);
 insertMap.set(" ", insertSpace);
 insertMap.set("Enter", doNothing);
 
-insertMap.set(";", escapeInsertMode);
 
 
 let shiftMap = new Map();
@@ -206,7 +237,29 @@ function backSpace(selection : letter | defName | parameter) : info {
         }
     }
     else if (selection.kind === "defName") {
-        
+        makeBlankDefName(selection.parent);
+        return {mode: "insert", selection: selection};
+    }
+    else if (selection.kind === "parameter") {
+        // remove selection from parameter list or just make it blank?
+        let leftSibling = getLeftSibling(selection);
+        deleteNode(selection);
+        return {mode: "insert", selection: leftSibling};
+    }
+    else {
+        return {mode: "insert", selection: selection};
+    }
+
+}
+
+// delete node and descendants from syntax tree
+// two steps: removing ref to node as a child of parent
+// and removing ref to node as a parent of its children
+function deleteNode(node : expression) {
+    if (node.kind === "defName") {
+        // every def has to have a name, so removing a defname
+        // will mean making the defName blank
+        makeBlankDefName(node.parent);
     }
 }
 
@@ -321,11 +374,6 @@ function getLeftSibling(node : expression) : expression {
     }
 }
 
-// change from insert mode to command mode
-function escapeInsertMode(selection : expression) : info {
-    return { mode: "command", selection: selection };
-}
-
 
 function selectRightSibling(selection : expression) : info {
     let rightSibling = getRightSibling(selection);
@@ -359,17 +407,6 @@ function selectParent(selection : expression) : info {
     }
 }
 
-// add new statement to the beginning of def body
-function addNewStatementToBody(selection : expression) {
-    
-}
-
-
-function enterInsertMode(selection : expression) : info {
-    return {mode: "insert", selection: selection};
-}
-
-
 function doNothing(selection : expression) {
     return true;
 }
@@ -389,40 +426,90 @@ function selectDefName(def : definition): info {
 // def name []
 function insertSpace(selection : letter) : info {
     if (selection.parent.kind === "defName") {
-        let def = selection.parent.parent;
-        let newParam : parameter = {
-            kind: "parameter",
-            content: [],
-            parent: def
-        }
-        def.parameters.unshift(newParam);
-        return {mode: "insert", selection: newParam};
+        return insertNewParamAtStart(selection);
     }
     else if (selection.parent.kind === "parameter") {
-        let def = selection.parent.parent;
-        let i = getIndexInList(selection.parent);
-        let parameters = selection.parent.parent.parameters;
-        let additionalParam : parameter = {
-            kind: "parameter",
-            content: [],
-            parent: def
-        }
-        parameters.splice(i+1, 0, additionalParam);
-        return {mode: "insert", selection: additionalParam};
+        return insertNewParamRight(selection);
     }
     else {
         return {mode: "insert", selection: selection};
     }
+
+    
 }
 
-// define sum a _
-// backspace
-// leads to an error
-// want to change it to get
-// define sum [a]
+// assumes that selection is a letter in a parameter
+function insertNewParamRight(selection: letter) : info {
+    if (selection.parent.kind === "parameter") {
+        let def = selection.parent.parent;
+        let i = getIndexInList(selection.parent);
+        let parameters = selection.parent.parent.parameters;
+        let additionalParam: parameter = {
+            kind: "parameter",
+            content: [],
+            parent: def
+        };
+        parameters.splice(i + 1, 0, additionalParam);
+        return { mode: "insert", selection: additionalParam};
+    }
+    else {
+        return { mode: "insert", selection: selection};
+    }
+}
 
-// if backspace is called when selection is an empty word
-// delete that empty word
-// select the previous word
-// prev word, means according to the order:
-// defname, param1, param2, param3 ..
+// assumes that selection is at end of defName
+// creates a new empty param at start of params and selects it
+function insertNewParamAtStart(selection: letter) : info {
+    if (selection.parent.kind === "defName") {
+        let def = selection.parent.parent;
+        let newParam: parameter = {
+            kind: "parameter",
+            content: [],
+            parent: def
+        };
+        def.parameters.unshift(newParam);
+        return { mode: "insert", selection: newParam };
+    }
+    else {
+        return { mode: "insert", selection: selection};
+    }
+}
+
+// most actions dont change the mode, but they change the tree and the selection
+// then there are commands that switch between modes
+
+// programming language / editor that should support defining an abstract interface
+// and automatically being able to quickly switch between implementations
+
+// start writing the code for the editor in the editor in my own language
+// this will make it clear when new features are needed
+// then can write code that transpiles to js to build the editor
+
+// need a backend to start saving the work
+
+// newState = transition oldState inputKey
+// newUi = print newState
+// type state = (tree, selection, mode)
+// (oldTree, oldSelection, oldMode, key) -->(newTree, newSelection, newMode)
+// 
+
+// need to be able to write comments
+// def main event
+//   inputKey = getKey event
+//   newState = transition oldState inputKey
+//   newUi = print newState
+// first get the editor to the point where you can write
+// the above text in the above format
+
+// def main even[t]
+// want to hit enter to go to next line (indented)
+
+// body of function
+// list of statements / expressions
+// a = f b
+// want to be able to select a, f, b, f b, or the whole line
+// let-expression
+// name = a
+// body = application f b
+
+// so far, every line could be considered a let expression

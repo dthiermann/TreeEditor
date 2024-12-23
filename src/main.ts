@@ -121,10 +121,12 @@ function commandMode(key : string, selection : expression) : info {
     if (commandMap.has(key)) {
         return commandMap.get(key)(selection);
     }
+    else if (key === "i") {
+        return { mode: "insert", selection };
+    }
     else {
         return { mode: "command", selection };
     }
-    
 }
 
 // handles user input when in insert mode
@@ -132,6 +134,9 @@ function insertMode(key : string, selection : expression) : info {
     // if key is not a letter or number, it should have an entry in insertMap
     if (insertMap.has(key)) {
         return insertMap.get(key)(selection);
+    }
+    else if (key === ";") {
+        return {mode: "command", selection: selection };
     }
     else {
         return insertAtSelectionInTree(key, selection);

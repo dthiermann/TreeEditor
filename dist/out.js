@@ -1,10 +1,18 @@
 "use strict";
 (() => {
   // src/tree.ts
+  function makeBlankDefName(parent) {
+    let blankDefName = {
+      kind: "defName",
+      content: [],
+      parent
+    };
+    parent.name = blankDefName;
+    return blankDefName;
+  }
   var commandMap = /* @__PURE__ */ new Map();
   commandMap.set("f", addBlankDef);
   commandMap.set("p", selectParent);
-  commandMap.set("i", enterInsertMode);
   commandMap.set("j", selectLeftSibling);
   commandMap.set("k", selectRightSibling);
   commandMap.set("r", selectDefName);
@@ -20,7 +28,6 @@
   insertMap.set("ArrowDown", doNothing);
   insertMap.set(" ", insertSpace);
   insertMap.set("Enter", doNothing);
-  insertMap.set(";", escapeInsertMode);
   function insertAtSelectionInTree(key, selection) {
     if (selection.kind === "letter") {
       return insertAtLetterInTree(key, selection);
@@ -82,6 +89,19 @@
         return { mode: "insert", selection: selection.parent };
       }
     } else if (selection.kind === "defName") {
+      makeBlankDefName(selection.parent);
+      return { mode: "insert", selection };
+    } else if (selection.kind === "parameter") {
+      let leftSibling = getLeftSibling(selection);
+      deleteNode(selection);
+      return { mode: "insert", selection: leftSibling };
+    } else {
+      return { mode: "insert", selection };
+    }
+  }
+  function deleteNode(node) {
+    if (node.kind === "defName") {
+      makeBlankDefName(node.parent);
     }
   }
   function getIndexInList(child) {
@@ -165,9 +185,6 @@
       return node;
     }
   }
-  function escapeInsertMode(selection) {
-    return { mode: "command", selection };
-  }
   function selectRightSibling(selection) {
     let rightSibling = getRightSibling(selection);
     return { mode: "command", selection: rightSibling };
@@ -183,9 +200,6 @@
       return { mode: "command", selection: selection.parent };
     }
   }
-  function enterInsertMode(selection) {
-    return { mode: "insert", selection };
-  }
   function doNothing(selection) {
     return true;
   }
@@ -198,15 +212,15 @@
   }
   function insertSpace(selection) {
     if (selection.parent.kind === "defName") {
-      let def = selection.parent.parent;
-      let newParam = {
-        kind: "parameter",
-        content: [],
-        parent: def
-      };
-      def.parameters.unshift(newParam);
-      return { mode: "insert", selection: newParam };
+      return insertNewParamAtStart(selection);
     } else if (selection.parent.kind === "parameter") {
+      return insertNewParamRight(selection);
+    } else {
+      return { mode: "insert", selection };
+    }
+  }
+  function insertNewParamRight(selection) {
+    if (selection.parent.kind === "parameter") {
       let def = selection.parent.parent;
       let i = getIndexInList(selection.parent);
       let parameters = selection.parent.parent.parameters;
@@ -220,6 +234,16 @@
     } else {
       return { mode: "insert", selection };
     }
+  }
+  function insertNewParamAtStart(selection) {
+    let def = selection.parent.parent;
+    let newParam = {
+      kind: "parameter",
+      content: [],
+      parent: def
+    };
+    def.parameters.unshift(newParam);
+    return { mode: "insert", selection: newParam };
   }
 
   // src/lowlevel.ts
@@ -415,6 +439,8 @@
   function commandMode(key, selection) {
     if (commandMap.has(key)) {
       return commandMap.get(key)(selection);
+    } else if (key === "i") {
+      return { mode: "insert", selection };
     } else {
       return { mode: "command", selection };
     }
@@ -422,6 +448,8 @@
   function insertMode(key, selection) {
     if (insertMap.has(key)) {
       return insertMap.get(key)(selection);
+    } else if (key === ";") {
+      return { mode: "command", selection };
     } else {
       return insertAtSelectionInTree(key, selection);
     }

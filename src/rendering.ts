@@ -2,7 +2,7 @@ import {color, setTextColorAt, setCharAt, clearDisplay, highlightAt, unhighlight
 import {expression, module, definition, word , defName } from "./tree"
 import {documentHeight, documentWidth, defKeyWord } from "./main"
 
-type nodeType = "defName" | "parameter" | "defKeyword";
+type nodeType = "defName" | "parameter" | "defKeyword" | "name";
 
 let colorTable : Map<nodeType, color> = new Map();
 colorTable.set("defName", "red");
@@ -10,7 +10,13 @@ colorTable.set("parameter", "blue");
 colorTable.set("defKeyword", "green");
 
 function getColor(key : nodeType) : color {
-    return colorTable.get(key) ?? "black";
+    if (colorTable.has(key)) {
+        return colorTable.get(key) ?? "black";
+    }
+    else {
+        return "black";
+    }
+    
 }
 
 // print String to the ui directly
