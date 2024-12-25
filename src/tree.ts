@@ -34,7 +34,7 @@ export type definition = {
     kind: "definition";
     name: defName | null;
     parameters: parameter[];
-    body?: letExpr[];
+    body: letExpr[];
     parent: module;
 }
 
@@ -54,6 +54,114 @@ export type letExpr = {
     parent: definition;
 }
 
+export class defNameClass {
+    kind: string;
+    content: letter[];
+    parent: defClass;
+
+    constructor(parent : defClass) {
+        this.parent = parent;
+        this.kind = "defName";
+        this.content = [];
+    }
+
+}
+
+export class letterClass {
+    kind: string;
+    content: string;
+    parent: word;
+
+    constructor(content : string, parent : word) {
+        this.content = content;
+        this.kind = "letter";
+        this.parent = parent;
+
+    }
+}
+
+export class parameterClass {
+    kind: string;
+    content: letterClass[];
+    parent: definition;
+
+    constructor(parent : definition) {
+        this.kind = "parameter";
+        this.content = [];
+        this.parent = parent;
+    }
+}
+
+export class defClass {
+    kind: string;
+    name: defNameClass;
+    parameters: parameterClass[];
+    body: statementClass[];
+    parent: moduleClass;
+
+    constructor(parent : moduleClass) {
+        this.kind = "definition";
+        this.name = new defNameClass(this);
+        this.parameters = [];
+        this.body = [];
+        this.parent = parent;
+    }
+}
+
+export class moduleClass {
+    kind: string;
+    children: defClass[];
+
+    constructor() {
+        this.kind = "module";
+        this.children = [];
+    }
+}
+
+export class statementClass {
+    kind: string;
+    name: nameClass;
+    value?: applicationClass | nameClass;
+    parent: defClass;
+
+    constructor(parent : defClass) {
+        this.parent = parent;
+        this.kind = "statement";
+        this.name = new nameClass(this);
+    }
+}
+// let x = 
+
+export class nameClass {
+    kind: string;
+    content: letterClass[];
+    parent: statementClass | applicationClass;
+
+    constructor(parent : applicationClass | statementClass) {
+        this.kind = "name";
+        this.content = [];
+        this.parent = parent;
+    }
+}
+
+// expr = word | application
+// application = (expr, expr)
+export type expr = nameClass | applicationClass;
+
+export class applicationClass {
+    kind: string;
+    left: expr;
+    right: expr;
+    parent: applicationClass | statementClass;
+
+    constructor(parent: applicationClass | statementClass) {
+        this.kind = "application";
+        this.left = new nameClass(this);
+        this.right = new nameClass(this);
+        this.parent = parent;
+    }
+
+}
 
 export type name = {
     kind: "name";
@@ -92,6 +200,17 @@ function makeBlankParameter(index : number, parent : definition) : parameter {
     parent.parameters.splice(index, 0, blankParameter);
     return blankParameter;
 }
+
+function makeBlankName(parent : application | letExpr) {
+    let blankName : name = {
+        kind: "name",
+        content: [],
+        parent: parent,
+    }
+    return blankName;
+}
+
+
 
 // add letter to parent word before letter at index
 // example:
@@ -387,15 +506,6 @@ function selectLeftSibling(selection : expression) : info {
 }
 
 
-
-function insertBlankRightSibling(selection : expression)  {
-    if (selection.kind === "defName") {
-        // add new parameter to start of parameter list
-
-
-    }
-}
-
 // select parent
 // if module is selected, changes nothing
 function selectParent(selection : expression) : info {
@@ -503,6 +613,32 @@ function insertNewParamAtStart(selection: letter) : info {
 
 // def main even[t]
 // want to hit enter to go to next line (indented)
+function insertLineBelow(selection : expression) : expression {
+    if (inDefHeader(selection)) {
+
+
+    }
+    
+}
+
+// checks if sel is a letter in defName or letter in parameter
+// or is defname or parameter
+// (letter and parent is defname)
+function inDefHeader(sel : expression) {
+    let isDefLetter = (sel.kind === "letter") && (sel.parent.kind === "defName");
+    let isParamLetter = (sel.kind === "letter") && (sel.parent.kind === "parameter");
+    let isDefName = sel.kind === "defName";
+    let isParam = sel.kind === "parameter";
+    return isDefLetter || isParamLetter || isDefName || isParam;
+}
+
+function insertLineAtIndexInBody(def : definition, index : number) {
+    // create a new empty letExpr
+    // insert new letExpr at start of body
+    // select the new letExpr
+
+}
+
 
 // body of function
 // list of statements / expressions
@@ -513,3 +649,6 @@ function insertNewParamAtStart(selection: letter) : info {
 // body = application f b
 
 // so far, every line could be considered a let expression
+// names are pointers to their defs
+// could implement goto def, or create def for,
+
