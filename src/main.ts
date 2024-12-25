@@ -1,6 +1,6 @@
 
 
-import { commandMap, insertMap, insertAtSelectionInTree, expression, module, definition } from "./tree"
+import { commandMap, insertMap, insertAtSelectionInTree, expression, module, definition, doNothing } from "./tree"
 import { color } from "./lowlevel"
 import { printModule } from "./rendering"
 
@@ -69,13 +69,16 @@ export let defKeyWord = "define ";
 
 export let documentNode : module = {
     kind: "module",
-    contents: [],
+    children: [],
 };
 
+// state is the current mode + current selection
 export let state : info = {
     mode: "command",
     selection: documentNode
 }
+let currentMode : mode = "command";
+let currentSelection : expression = documentNode;
 
 document.addEventListener("keydown", main);
 
@@ -83,12 +86,21 @@ document.addEventListener("keydown", main);
 function main(e : KeyboardEvent) {
     e.preventDefault();
     let key = e.key;
-    // console.log(key);
-    // update the mode and selection and tree:
-    state = handleInput(key, state);
-    // update the ui:
-    printModule(documentNode, state.selection);
-    updateTable(state.mode);
+    // either key changes mode --> update table
+    if (currentMode === "command" && key === "i") {
+        currentMode = "insert";
+        updateTable(currentMode);
+    }
+    else if (currentMode === "insert" && key === ";") {
+        currentMode = "command";
+        updateTable(currentMode);
+    }
+    else {
+        // key changes tree and selection --> update textbox
+        currentSelection = handleInput(key, currentSelection, currentMode);
+        printModule(documentNode, currentSelection);
+
+    }
 }
 
 
@@ -105,41 +117,33 @@ function updateTable(currentMode : mode) {
     }
 }
 
-function handleInput(key : string, state : info) : info {
-    let newState = state;
-    if (state.mode == "insert") {
-        newState = insertMode(key, state.selection);
+function handleInput(key : string, selection : expression, mode : mode) : expression {
+    let newSelection = selection;
+    if (mode == "insert") {
+        newSelection = insertMode(key, selection);
     }
-    if (state.mode == "command") {
-        newState = commandMode(key, state.selection);
+    if (mode == "command") {
+        newSelection = commandMode(key, selection);
     }
-    return newState;
+    return newSelection;
 }
 
 
-function commandMode(key : string, selection : expression) : info {
-    if (commandMap.has(key)) {
-        return commandMap.get(key)(selection);
-    }
-    else if (key === "i") {
-        return { mode: "insert", selection };
-    }
-    else {
-        return { mode: "command", selection };
-    }
+function commandMode(key : string, selection : expression) : expression {
+    let command = commandMap.get(key) ?? doNothing;
+    return command(selection);
 }
 
 // handles user input when in insert mode
-function insertMode(key : string, selection : expression) : info {
+function insertMode(key : string, selection : expression) : expression {
     // if key is not a letter or number, it should have an entry in insertMap
-    if (insertMap.has(key)) {
-        return insertMap.get(key)(selection);
-    }
-    else if (key === ";") {
-        return {mode: "command", selection: selection };
+    
+    let insertCommand = insertMap.get(key);
+    if (insertCommand) {
+        return insertCommand(selection);
     }
     else {
-        return insertAtSelectionInTree(key, selection);
+        return selection;
     }
 }
 

@@ -2,14 +2,13 @@ import {color, setTextColorAt, setCharAt, clearDisplay, highlightAt, unhighlight
 import {expression, module, definition, word , defName } from "./tree"
 import {documentHeight, documentWidth, defKeyWord } from "./main"
 
-type nodeType = "defName" | "parameter" | "defKeyword" | "name";
 
-let colorTable : Map<nodeType, color> = new Map();
+let colorTable : Map<string, color> = new Map();
 colorTable.set("defName", "red");
 colorTable.set("parameter", "blue");
 colorTable.set("defKeyword", "green");
 
-function getColor(key : nodeType) : color {
+function getColor(key : string) : color {
     if (colorTable.has(key)) {
         return colorTable.get(key) ?? "black";
     }
@@ -40,11 +39,11 @@ function copyArrayToPosition(textArray : string[], newRow : number, newStart : n
 // prints the first def child of mod
 // doesn't highlight any children, even if they are selected
 export function printModule(mod : module, selectedNode : expression) {
-    if (mod.contents.length == 0) {
+    if (mod.children.length == 0) {
 
     }
     else {
-        printDef(mod.contents[0], selectedNode);
+        printDef(mod.children[0], selectedNode);
     }
 }
 
@@ -56,15 +55,7 @@ function printDef(def : definition, selectedNode : expression) {
 
     printString(defKeyWord, 0, 0, getColor("defKeyword"));
 
-    let name : defName = {
-        kind: "defName",
-        parent: def,
-        content: [],
-    }
-
-    if (def.name != null) {
-        name = def.name;
-    }
+    let name = new defName(def);
 
     let nameList : word[] = [name];
     let parameters = def.parameters as word[];
@@ -98,7 +89,7 @@ function printListOfWords(words : word[], row: number, x: number, selectedNode :
 // prints word and highlights any selected letters
 // empty words should be printed as " "
 function printWord(word : word, row : number, x : number, selectedNode : expression) {
-    let color = getColor(word.kind);
+    let color = getColor(word.constructor.name);
     for (let i = 0; i < word.content.length; i ++) {
         if (word.content[i] === selectedNode) {
             highlightAt(row, x + i);
@@ -108,6 +99,8 @@ function printWord(word : word, row : number, x : number, selectedNode : express
     }
     
 }
+
+// if word.constructor.name in nodeTypes
 
 
 // prints and highlights entire word
