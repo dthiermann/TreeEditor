@@ -1,21 +1,64 @@
 "use strict";
 (() => {
   // src/tree.ts
-  function makeBlankDefName(parent) {
-    let blankDefName = {
-      kind: "defName",
-      content: [],
-      parent
-    };
-    parent.name = blankDefName;
-    return blankDefName;
-  }
+  var defName = class {
+    kind;
+    content;
+    parent;
+    constructor(parent) {
+      this.parent = parent;
+      this.kind = "defName";
+      this.content = [];
+    }
+  };
+  var letter = class {
+    kind;
+    content;
+    parent;
+    constructor(content, parent) {
+      this.content = content;
+      this.kind = "letter";
+      this.parent = parent;
+    }
+  };
+  var parameter = class {
+    kind;
+    content;
+    parent;
+    constructor(parent) {
+      this.kind = "parameter";
+      this.content = [];
+      this.parent = parent;
+    }
+  };
+  var definition = class {
+    kind;
+    name;
+    parameters;
+    body;
+    parent;
+    constructor(parent) {
+      this.kind = "definition";
+      this.name = new defName(this);
+      this.parameters = [];
+      this.body = [];
+      this.parent = parent;
+    }
+  };
+  var module = class {
+    kind;
+    children;
+    constructor() {
+      this.kind = "module";
+      this.children = [];
+    }
+  };
   var commandMap = /* @__PURE__ */ new Map();
-  commandMap.set("f", addBlankDef);
+  commandMap.set("f", addNewChild);
   commandMap.set("p", selectParent);
-  commandMap.set("j", selectLeftSibling);
-  commandMap.set("k", selectRightSibling);
-  commandMap.set("r", selectDefName);
+  commandMap.set("j", getLeftSibling);
+  commandMap.set("k", getRightSibling);
+  commandMap.set("r", selectFirstChild);
   var insertMap = /* @__PURE__ */ new Map();
   insertMap.set("Backspace", backSpace);
   insertMap.set("Tab", doNothing);
@@ -29,86 +72,71 @@
   insertMap.set(" ", insertSpace);
   insertMap.set("Enter", doNothing);
   function insertAtSelectionInTree(key, selection) {
-    if (selection.kind === "letter") {
+    if (selection instanceof letter) {
       return insertAtLetterInTree(key, selection);
-    }
-    if (selection.kind === "defName") {
-      let newLetter = {
-        kind: "letter",
-        parent: selection,
-        content: key
-      };
+    } else if (selection instanceof defName) {
+      let newLetter = new letter(key, selection);
+      selection.content = [newLetter];
+      selection = newLetter;
+    } else if (selection instanceof parameter) {
+      let newLetter = new letter(key, selection);
       selection.content = [newLetter];
       selection = newLetter;
     }
-    if (selection.kind === "parameter") {
-      let newLetter = {
-        kind: "letter",
-        parent: selection,
-        content: key
-      };
-      selection.content = [newLetter];
-      selection = newLetter;
-    }
-    return { mode: "insert", selection };
+    return selection;
   }
   function insertAtLetterInTree(key, selection) {
     let word = selection.parent;
     let i = getIndexInList(selection);
-    let newLetter = {
-      kind: "letter",
-      parent: word,
-      content: key
-    };
+    let newLetter = new letter(key, word);
     word.content.splice(i + 1, 0, newLetter);
-    return { mode: "insert", selection: newLetter };
+    return newLetter;
   }
   function addBlankDef(document2) {
-    let blankDef = addBlankDefToModule(document2);
-    let blankName = addBlankNameToDef(blankDef);
-    return { mode: "insert", selection: blankName };
+    let blankdef = new definition(document2);
+    document2.children.push(blankdef);
+    return blankdef.name;
   }
-  function addBlankDefToModule(mod) {
-    let blankDef = {
-      kind: "definition",
-      parent: mod,
-      name: null,
-      parameters: []
-    };
-    mod.contents.push(blankDef);
-    return blankDef;
+  function addNewChild(selection) {
+    if (selection instanceof module) {
+      return addBlankDef(selection);
+    } else {
+      return selection;
+    }
   }
   function backSpace(selection) {
-    if (selection.kind === "letter") {
+    if (selection instanceof letter) {
       let i = getIndexInList(selection);
       let newSelection = getLeftSibling(selection);
       selection.parent.content.splice(i, 1);
       if (selection.parent.content.length > 0) {
-        return { mode: "insert", selection: newSelection };
+        return newSelection;
       } else {
-        return { mode: "insert", selection: selection.parent };
+        return selection.parent;
       }
-    } else if (selection.kind === "defName") {
-      makeBlankDefName(selection.parent);
-      return { mode: "insert", selection };
-    } else if (selection.kind === "parameter") {
+    }
+    if (selection instanceof defName) {
+      selection.content = [];
+      return selection;
+    }
+    if (selection instanceof parameter) {
       let leftSibling = getLeftSibling(selection);
       deleteNode(selection);
-      return { mode: "insert", selection: leftSibling };
+      return leftSibling;
     } else {
-      return { mode: "insert", selection };
+      return selection;
     }
   }
   function deleteNode(node) {
-    if (node.kind === "defName") {
-      makeBlankDefName(node.parent);
+    if (node instanceof defName) {
+      node.content = [];
     }
   }
   function getIndexInList(child) {
-    if (child.kind === "letter") {
+    if (child instanceof letter) {
       return getLetterList(child).indexOf(child);
     }
-    if (child.kind === "parameter") {
+    if (child instanceof parameter) {
       return getParameterList(child).indexOf(child);
     } else {
       return -1;
@@ -120,29 +148,14 @@
   function getParameterList(child) {
     return child.parent.parameters;
   }
-  function addBlankNameToDef(def) {
-    let blankName = {
-      kind: "defName",
-      content: [],
-      parent: def
-    };
-    def.name = blankName;
-    return blankName;
-  }
   function getRightSibling(node) {
-    if (node.kind === "defName") {
+    if (node instanceof defName) {
       if (node.parent.parameters.length == 0) {
-        let emptyParam = {
-          kind: "parameter",
-          content: [],
-          parent: node.parent
-        };
-        node.parent.parameters.push(emptyParam);
-        return emptyParam;
+        return node;
       } else {
         return node.parent.parameters[0];
       }
-    } else if (node.kind === "parameter") {
+    } else if (node instanceof parameter) {
       let i = getIndexInList(node);
       let parameters = node.parent.parameters;
       if (i < parameters.length - 1) {
@@ -150,7 +163,7 @@
       } else {
         return node;
       }
-    } else if (node.kind === "letter") {
+    } else if (node instanceof letter) {
       let i = getIndexInList(node);
       let letterList = node.parent.content;
       if (i < letterList.length - 1) {
@@ -163,9 +176,9 @@
     }
   }
   function getLeftSibling(node) {
-    if (node.kind === "defName") {
+    if (node instanceof defName) {
       return node;
-    } else if (node.kind === "parameter") {
+    } else if (node instanceof parameter) {
       let i = getIndexInList(node);
       let parameters = node.parent.parameters;
       if (i > 0) {
@@ -173,7 +186,7 @@
       } else {
         return node.parent.name ?? node;
       }
-    } else if (node.kind === "letter") {
+    } else if (node instanceof letter) {
       let i = getIndexInList(node);
       let letterList = node.parent.content;
       if (i > 0) {
@@ -185,65 +198,60 @@
       return node;
     }
   }
-  function selectRightSibling(selection) {
-    let rightSibling = getRightSibling(selection);
-    return { mode: "command", selection: rightSibling };
-  }
-  function selectLeftSibling(selection) {
-    let leftSibling = getLeftSibling(selection);
-    return { mode: "command", selection: leftSibling };
-  }
   function selectParent(selection) {
-    if (selection.kind === "module") {
-      return { mode: "command", selection };
+    if (selection instanceof module) {
+      return selection;
     } else {
-      return { mode: "command", selection: selection.parent };
+      return selection.parent;
     }
   }
   function doNothing(selection) {
-    return true;
+    return selection;
   }
-  function selectDefName(def) {
-    if (def.name === null) {
-      return { mode: "command", selection: def };
+  function selectFirstChild(selection) {
+    if (selection instanceof definition) {
+      return selection.name;
     } else {
-      return { mode: "command", selection: def.name };
+      return selection;
     }
   }
-  function insertSpace(selection) {
+  function insertSpaceAfterLetter(selection) {
     if (selection.parent.kind === "defName") {
       return insertNewParamAtStart(selection);
     } else if (selection.parent.kind === "parameter") {
       return insertNewParamRight(selection);
     } else {
-      return { mode: "insert", selection };
+      return selection;
+    }
+  }
+  function insertSpace(selection) {
+    if (selection instanceof letter) {
+      return insertSpaceAfterLetter(selection);
+    } else {
+      return selection;
     }
   }
   function insertNewParamRight(selection) {
-    if (selection.parent.kind === "parameter") {
+    if (selection.parent instanceof parameter) {
       let def = selection.parent.parent;
       let i = getIndexInList(selection.parent);
       let parameters = selection.parent.parent.parameters;
-      let additionalParam = {
-        kind: "parameter",
-        content: [],
-        parent: def
-      };
+      let additionalParam = new parameter(def);
       parameters.splice(i + 1, 0, additionalParam);
-      return { mode: "insert", selection: additionalParam };
+      return additionalParam;
     } else {
-      return { mode: "insert", selection };
+      return selection;
     }
   }
   function insertNewParamAtStart(selection) {
-    let def = selection.parent.parent;
-    let newParam = {
-      kind: "parameter",
-      content: [],
-      parent: def
-    };
-    def.parameters.unshift(newParam);
-    return { mode: "insert", selection: newParam };
+    if (selection.parent instanceof defName) {
+      let def = selection.parent.parent;
+      let newParam = new parameter(def);
+      def.parameters.unshift(newParam);
+      return newParam;
+    } else {
+      return selection;
+    }
   }
 
   // src/lowlevel.ts
@@ -301,7 +309,11 @@
   colorTable.set("parameter", "blue");
   colorTable.set("defKeyword", "green");
   function getColor(key) {
-    return colorTable.get(key) ?? "black";
+    if (colorTable.has(key)) {
+      return colorTable.get(key) ?? "black";
+    } else {
+      return "black";
+    }
   }
   function printString(str, row, x, color2) {
     for (let i = 0; i < str.length; i++) {
@@ -310,22 +322,15 @@
     }
   }
   function printModule(mod, selectedNode) {
-    if (mod.contents.length == 0) {
+    if (mod.children.length == 0) {
     } else {
-      printDef(mod.contents[0], selectedNode);
+      printDef(mod.children[0], selectedNode);
     }
   }
   function printDef(def, selectedNode) {
     clearDisplay(documentHeight, documentWidth);
     printString(defKeyWord, 0, 0, getColor("defKeyword"));
-    let name = {
-      kind: "defName",
-      parent: def,
-      content: []
-    };
-    if (def.name != null) {
-      name = def.name;
-    }
+    let name = def.name;
     let nameList = [name];
     let parameters = def.parameters;
     let restOfLine = nameList.concat(parameters);
@@ -344,7 +349,7 @@
     });
   }
   function printWord(word, row, x, selectedNode) {
-    let color2 = getColor(word.kind);
+    let color2 = getColor(word.constructor.name);
     for (let i = 0; i < word.content.length; i++) {
       if (word.content[i] === selectedNode) {
         highlightAt(row, x + i);
@@ -401,55 +406,51 @@
   var documentWidth = 80;
   newDocument(textBox, documentWidth, documentHeight);
   var defKeyWord = "define ";
-  var documentNode = {
-    kind: "module",
-    contents: []
-  };
-  var state = {
-    mode: "command",
-    selection: documentNode
-  };
+  var documentNode = new module();
+  var currentMode = "command";
+  var currentSelection = documentNode;
   document.addEventListener("keydown", main);
   function main(e) {
     e.preventDefault();
     let key = e.key;
-    state = handleInput(key, state);
-    printModule(documentNode, state.selection);
-    updateTable(state.mode);
+    if (currentMode === "command" && key === "i") {
+      currentMode = "insert";
+      updateTable(currentMode);
+    } else if (currentMode === "insert" && key === ";") {
+      currentMode = "command";
+      updateTable(currentMode);
+    } else {
+      currentSelection = handleInput(key, currentSelection, currentMode);
+      printModule(documentNode, currentSelection);
+      console.log(currentSelection);
+    }
   }
-  function updateTable(currentMode) {
+  function updateTable(currentMode2) {
     let currentTable = document.getElementsByClassName("commandTable")[0];
     container.removeChild(currentTable);
-    if (currentMode === "insert") {
+    if (currentMode2 === "insert") {
       container.appendChild(insertTable);
-    } else if (currentMode === "command") {
+    } else if (currentMode2 === "command") {
       container.appendChild(commandTable);
     }
   }
-  function handleInput(key, state2) {
-    let newState = state2;
-    if (state2.mode == "insert") {
-      newState = insertMode(key, state2.selection);
+  function handleInput(key, selection, mode) {
+    if (mode == "insert") {
+      return insertMode(key, selection);
+    } else if (mode == "command") {
+      return commandMode(key, selection);
+    } else {
+      return selection;
     }
-    if (state2.mode == "command") {
-      newState = commandMode(key, state2.selection);
-    }
-    return newState;
   }
   function commandMode(key, selection) {
-    if (commandMap.has(key)) {
-      return commandMap.get(key)(selection);
-    } else if (key === "i") {
-      return { mode: "insert", selection };
-    } else {
-      return { mode: "command", selection };
-    }
+    let command = commandMap.get(key) ?? doNothing;
+    return command(selection);
   }
   function insertMode(key, selection) {
-    if (insertMap.has(key)) {
-      return insertMap.get(key)(selection);
-    } else if (key === ";") {
-      return { mode: "command", selection };
+    let insertCommand = insertMap.get(key);
+    if (insertCommand) {
+      return insertCommand(selection);
     } else {
       return insertAtSelectionInTree(key, selection);
     }

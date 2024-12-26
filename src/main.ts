@@ -17,11 +17,6 @@ container.appendChild(commandTable);
 commandTable.classList.add("commandTable");
 
 
-export type info = {
-    mode: mode;
-    selection: expression
-}
-
 export type mode = "insert" | "command";
 
 // for each (key, value) pair in command map
@@ -67,16 +62,8 @@ newDocument(textBox, documentWidth, documentHeight);
 
 export let defKeyWord = "define ";
 
-export let documentNode : module = {
-    kind: "module",
-    children: [],
-};
+export let documentNode = new module();
 
-// state is the current mode + current selection
-export let state : info = {
-    mode: "command",
-    selection: documentNode
-}
 let currentMode : mode = "command";
 let currentSelection : expression = documentNode;
 
@@ -118,14 +105,15 @@ function updateTable(currentMode : mode) {
 }
 
 function handleInput(key : string, selection : expression, mode : mode) : expression {
-    let newSelection = selection;
     if (mode == "insert") {
-        newSelection = insertMode(key, selection);
+        return insertMode(key, selection);
     }
-    if (mode == "command") {
-        newSelection = commandMode(key, selection);
+    else if (mode == "command") {
+        return commandMode(key, selection);
     }
-    return newSelection;
+    else {
+        return selection;
+    }
 }
 
 
@@ -143,7 +131,7 @@ function insertMode(key : string, selection : expression) : expression {
         return insertCommand(selection);
     }
     else {
-        return selection;
+        return insertAtSelectionInTree(key, selection);
     }
 }
 

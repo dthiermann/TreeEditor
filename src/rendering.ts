@@ -55,7 +55,7 @@ function printDef(def : definition, selectedNode : expression) {
 
     printString(defKeyWord, 0, 0, getColor("defKeyword"));
 
-    let name = new defName(def);
+    let name = def.name;
 
     let nameList : word[] = [name];
     let parameters = def.parameters as word[];
@@ -65,6 +65,10 @@ function printDef(def : definition, selectedNode : expression) {
     printListOfWords(restOfLine, 0, defKeyWord.length, selectedNode);
 
 }
+// printing a def
+// defKeyWord + name + params
+// indent --> body
+
 
 
 // should print a list of words on one line, separating them by spaces
@@ -99,9 +103,6 @@ function printWord(word : word, row : number, x : number, selectedNode : express
     }
     
 }
-
-// if word.constructor.name in nodeTypes
-
 
 // prints and highlights entire word
 function printAndHighlightWord(word : word, row : number, x : number) {

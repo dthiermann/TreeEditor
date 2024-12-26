@@ -1,16 +1,16 @@
-import { info } from "./main"
 
 export type word = defName | parameter | name;
 
 export class defName {
-    kind: string;
     content: letter[];
     parent: definition;
 
+    // creates an empty defName and adds it to parent
     constructor(parent : definition) {
         this.parent = parent;
-        this.kind = "defName";
+        parent.name = this;
         this.content = [];
+
     }
 
 }
@@ -190,15 +190,9 @@ function insertAtLetterInTree(key : string, selection : letter) : expression {
 
 
 function addBlankDef(document : module) : defName {
-
-    // create a blank def, add that def to the document,
-    let blankDef = addBlankDefToModule(document);
-    
-    // create a blank name, add that name to the def,
-    let blankName = addBlankNameToDef(blankDef);
-
-    // select the name
-    return blankName;
+    let blankdef = new definition(document);
+    document.children.push(blankdef);
+    return blankdef.name;
 }
 
 function addNewChild(selection : expression) : expression {
@@ -210,12 +204,6 @@ function addNewChild(selection : expression) : expression {
     }
 }
 
-
-function addBlankDefToModule(mod : module) : definition {
-    let blankDef = new definition(mod);
-    mod.children.push(blankDef);
-    return blankDef;
-}
 
 // nam[e] --> na[m]
 // he[a]p --> h[e]p
@@ -287,18 +275,6 @@ function getLetterList(child: letter) : letter[] {
 function getParameterList(child: parameter) : parameter[] {
     return child.parent.parameters;
 }
-
-
-function addBlankNameToDef(def : definition) : defName {
-    let blankName : defName = {
-        kind: "defName",
-        content: [],
-        parent: def
-    }
-    def.name = blankName;
-    return blankName;
-}
-
 
 // if node has a rightSibling, return it,
 // otherwise return original node
@@ -398,10 +374,10 @@ function selectFirstChild(selection : expression) : expression {
 // press space
 // def name []
 function insertSpaceAfterLetter(selection : letter) : expression {
-    if (selection.parent.kind === "defName") {
+    if (selection.parent instanceof defName) {
         return insertNewParamAtStart(selection);
     }
-    else if (selection.parent.kind === "parameter") {
+    else if (selection.parent instanceof parameter) {
         return insertNewParamRight(selection);
     }
     else {
@@ -476,22 +452,28 @@ function insertNewParamAtStart(selection: letter) : expression {
 
 
 function insertLineAtIndexInBody(def : definition, index : number) {
-    // create a new empty letExpr
-    // insert new letExpr at start of body
-    // select the new letExpr
+    
 
 }
 
+// TO DO
+// be able to highlight whole def when its selected
 
-// body of function
-// list of statements / expressions
-// a = f b
-// want to be able to select a, f, b, f b, or the whole line
-// let-expression
-// name = a
-// body = application f b
+// changing selection
+// left sibling, right sibling, parent, firstchild
+// if can't go further in some direction, want to stay on current selection
 
-// so far, every line could be considered a let expression
-// names are pointers to their defs
-// could implement goto def, or create def for,
+// inserting nodes
+// 
 
+// deleting nodes
+
+// rendering: being able to highlight defs
+// being able to highlight any 
+
+// maybe try just making a uniform tree editor
+
+// parent
+//   parent
+//     child1
+//     child2
