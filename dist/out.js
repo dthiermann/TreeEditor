@@ -2,12 +2,12 @@
 (() => {
   // src/tree.ts
   var defName = class {
-    kind;
     content;
     parent;
+    // creates an empty defName and adds it to parent
     constructor(parent) {
       this.parent = parent;
-      this.kind = "defName";
+      parent.name = this;
       this.content = [];
     }
   };
@@ -216,9 +216,9 @@
     }
   }
   function insertSpaceAfterLetter(selection) {
-    if (selection.parent.kind === "defName") {
+    if (selection.parent instanceof defName) {
       return insertNewParamAtStart(selection);
-    } else if (selection.parent.kind === "parameter") {
+    } else if (selection.parent instanceof parameter) {
       return insertNewParamRight(selection);
     } else {
       return selection;
@@ -321,8 +321,17 @@
       setCharAt(row, x + i, str[i]);
     }
   }
+  function printAndHighlightString(str, row, x, color2) {
+    for (let i = 0; i < str.length; i++) {
+      setTextColorAt(row, x + i, color2);
+      setCharAt(row, x + i, str[i]);
+      highlightAt(row, x + i);
+    }
+  }
   function printModule(mod, selectedNode) {
     if (mod.children.length == 0) {
+    } else if (mod.children[0] === selectedNode) {
+      printAndHighlightDef(mod.children[0]);
     } else {
       printDef(mod.children[0], selectedNode);
     }
@@ -335,6 +344,24 @@
     let parameters = def.parameters;
     let restOfLine = nameList.concat(parameters);
     printListOfWords(restOfLine, 0, defKeyWord.length, selectedNode);
+  }
+  function printAndHighlightDef(def) {
+    clearDisplay(documentHeight, documentWidth);
+    printAndHighlightString(defKeyWord, 0, 0, getColor("defKeyword"));
+    let name = def.name;
+    let nameList = [name];
+    let parameters = def.parameters;
+    let restOfLine = nameList.concat(parameters);
+    printAndHighlightListOfWords(restOfLine, 0, defKeyWord.length);
+  }
+  function printAndHighlightListOfWords(words, row, x) {
+    let position = x;
+    words.forEach((word) => {
+      printAndHighlightWord(word, row, position);
+      highlightAt(row, position + 1);
+      let printingLength = Math.max(1, word.content.length);
+      position = position + printingLength + 1;
+    });
   }
   function printListOfWords(words, row, x, selectedNode) {
     let position = x;
@@ -422,7 +449,6 @@
     } else {
       currentSelection = handleInput(key, currentSelection, currentMode);
       printModule(documentNode, currentSelection);
-      console.log(currentSelection);
     }
   }
   function updateTable(currentMode2) {

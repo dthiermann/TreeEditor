@@ -28,6 +28,15 @@ function printString(str : string, row : number, x: number, color: color) {
     }
 }
 
+function printAndHighlightString(str : string, row : number, x: number, color : color) {
+    for (let i = 0; i < str.length; i++) {
+        setTextColorAt(row, x + i, color);
+        setCharAt(row, x + i, str[i]);
+        highlightAt(row, x + i);
+        
+    }
+}
+
 
 function copyArrayToPosition(textArray : string[], newRow : number, newStart : number) {
     for (let i = 0; i < textArray.length; i ++) {
@@ -41,6 +50,9 @@ function copyArrayToPosition(textArray : string[], newRow : number, newStart : n
 export function printModule(mod : module, selectedNode : expression) {
     if (mod.children.length == 0) {
 
+    }
+    else if (mod.children[0] === selectedNode) {
+        printAndHighlightDef(mod.children[0]);
     }
     else {
         printDef(mod.children[0], selectedNode);
@@ -68,8 +80,29 @@ function printDef(def : definition, selectedNode : expression) {
 // printing a def
 // defKeyWord + name + params
 // indent --> body
+function printAndHighlightDef(def : definition) {
+    clearDisplay(documentHeight, documentWidth);
+    printAndHighlightString(defKeyWord, 0, 0, getColor("defKeyword"));
 
+    let name = def.name;
 
+    let nameList : word[] = [name];
+    let parameters = def.parameters as word[];
+
+    let restOfLine = nameList.concat(parameters);
+   
+    printAndHighlightListOfWords(restOfLine, 0, defKeyWord.length);
+}
+
+function printAndHighlightListOfWords(words : word[], row: number, x: number) {
+    let position = x;
+    words.forEach(word => {
+        printAndHighlightWord(word, row, position);
+        highlightAt(row, position + 1);
+        let printingLength = Math.max(1, word.content.length);
+        position = position + printingLength + 1;
+    })
+}
 
 // should print a list of words on one line, separating them by spaces
 // if word is empty, should give it a space
@@ -114,3 +147,8 @@ function printAndHighlightWord(word : word, row : number, x : number) {
         highlightAt(row, x + i);
     }
 }
+
+// printing and highlighting
+// to print and highlight def
+// need to print and highlight list of words
+// 
