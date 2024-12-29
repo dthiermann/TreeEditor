@@ -1,7 +1,7 @@
 
 
 import { commandMap, insertMap, insertAtSelectionInTree, expression, module, definition, doNothing } from "./tree"
-import { color } from "./lowlevel"
+import { color , clearDisplay} from "./lowlevel"
 import { printModule } from "./rendering"
 
 let container = document.createElement("div");
@@ -84,7 +84,9 @@ function main(e : KeyboardEvent) {
     }
     else {
         // key changes tree and selection --> update textbox
+
         currentSelection = handleInput(key, currentSelection, currentMode);
+        clearDisplay(documentHeight, documentWidth);
         printModule(documentNode, currentSelection);
 
     }

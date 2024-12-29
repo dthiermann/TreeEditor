@@ -74,6 +74,18 @@
       this.parent = parent;
     }
   };
+  var application = class {
+    kind;
+    left;
+    right;
+    parent;
+    constructor(parent) {
+      this.kind = "application";
+      this.left = new name(this);
+      this.right = new name(this);
+      this.parent = parent;
+    }
+  };
   var commandMap = /* @__PURE__ */ new Map();
   commandMap.set("f", addNewChild);
   commandMap.set("p", selectParent);
@@ -107,10 +119,10 @@
     return selection;
   }
   function insertAtLetterInTree(key, selection) {
-    let word = selection.parent;
+    let word2 = selection.parent;
     let i = getIndexInList(selection);
-    let newLetter = new letter(key, word);
-    word.content.splice(i + 1, 0, newLetter);
+    let newLetter = new letter(key, word2);
+    word2.content.splice(i + 1, 0, newLetter);
     return newLetter;
   }
   function addBlankDef(document2) {
@@ -298,10 +310,10 @@
       }
     }
   }
-  function setTextColorAt(row, x, color2) {
+  function setTextColorAt(row, x, color3) {
     let div = getDivAt(row, x);
     if (div !== null) {
-      div.style.color = color2;
+      div.style.color = color3;
     }
   }
   function getDivAt(y, x) {
@@ -349,83 +361,130 @@
       return "black";
     }
   }
-  function printString(str, row, x, color2) {
-    for (let i = 0; i < str.length; i++) {
-      setTextColorAt(row, x + i, color2);
-      setCharAt(row, x + i, str[i]);
+  var displayChar = class {
+    key;
+    color;
+    selected;
+    constructor(key, color3, selected) {
+      this.key = key;
+      this.color = color3;
+      this.selected = selected;
     }
-  }
-  function printAndHighlightString(str, row, x, color2) {
-    for (let i = 0; i < str.length; i++) {
-      setTextColorAt(row, x + i, color2);
-      setCharAt(row, x + i, str[i]);
-      highlightAt(row, x + i);
-    }
-  }
+  };
   function printModule(mod, selectedNode) {
     if (mod.children.length == 0) {
-    } else if (mod.children[0] === selectedNode) {
-      printAndHighlightDef(mod.children[0]);
     } else {
-      printDef(mod.children[0], selectedNode);
+      printDef(mod.children[0], 0, selectedNode);
     }
   }
-  function printDef(def, selectedNode) {
-    clearDisplay(documentHeight, documentWidth);
-    printString(defKeyWord, 0, 0, getColor("defKeyword"));
-    let name2 = def.name;
-    let nameList = [name2];
-    let parameters = def.parameters;
-    let restOfLine = nameList.concat(parameters);
-    printListOfWords(restOfLine, 0, defKeyWord.length, selectedNode);
+  function printDef(def, row, selection) {
+    let header = displayDefHeader(def, selection);
+    printLine(row, 0, header);
+    printBody(def.body, row + 1, selection);
   }
-  function printAndHighlightDef(def) {
-    clearDisplay(documentHeight, documentWidth);
-    printAndHighlightString(defKeyWord, 0, 0, getColor("defKeyword"));
-    let name2 = def.name;
-    let nameList = [name2];
-    let parameters = def.parameters;
-    let restOfLine = nameList.concat(parameters);
-    printAndHighlightListOfWords(restOfLine, 0, defKeyWord.length);
+  function printBody(body, startingRow, selection) {
+    for (let i = 0; i < body.length; i++) {
+      let displayedLine = displayStatement(body[i], selection);
+      printLine(startingRow + i, 4, displayedLine);
+    }
   }
-  function printAndHighlightListOfWords(words, row, x) {
-    let position = x;
-    words.forEach((word) => {
-      printAndHighlightWord(word, row, position);
-      highlightAt(row, position + 1);
-      let printingLength = Math.max(1, word.content.length);
-      position = position + printingLength + 1;
-    });
-  }
-  function printListOfWords(words, row, x, selectedNode) {
-    let position = x;
-    words.forEach((word) => {
-      if (word === selectedNode) {
-        printAndHighlightWord(word, row, position);
-      } else {
-        printWord(word, row, position, selectedNode);
+  function printLine(row, indent, chars) {
+    for (let i = 0; i < chars.length; i++) {
+      setTextColorAt(row, i + indent, chars[i].color);
+      setCharAt(row, i + indent, chars[i].key);
+      if (chars[i].selected) {
+        highlightAt(row, i + indent);
       }
-      let printingLength = Math.max(1, word.content.length);
-      position = position + printingLength + 1;
-    });
+    }
   }
-  function printWord(word, row, x, selectedNode) {
-    let color2 = getColor(word.constructor.name);
-    for (let i = 0; i < word.content.length; i++) {
-      if (word.content[i] === selectedNode) {
-        highlightAt(row, x + i);
+  function displayLetter(a, color3, selection) {
+    return new displayChar(a.content, color3, a === selection);
+  }
+  function displayWord(myWord, selection) {
+    let color3 = getColor(myWord.constructor.name);
+    let selected = myWord === selection;
+    if (myWord.content.length == 0) {
+      return displayString(" ", color3, selected);
+    } else {
+      return myWord.content.map(
+        (char) => displayLetter(char, color3, selection)
+      );
+    }
+  }
+  function displayString(str, color3, selected) {
+    let stringList = Array.from(str);
+    return stringList.map((char) => new displayChar(char, color3, selected));
+  }
+  function displayApplication(ap, selection) {
+    let space = displayString(" ", "black", false);
+    let displayedLeft = [];
+    let displayedRight = [];
+    if (ap.left instanceof name && ap.right instanceof name) {
+      displayedLeft = displayWord(ap.left, selection);
+      displayedRight = displayWord(ap.right, selection);
+    } else if (ap.left instanceof name && ap.right instanceof application) {
+      displayedLeft = displayWord(ap.left, selection);
+      displayedRight = displayApplicationWithParens(ap.right, selection);
+    } else if (ap.left instanceof application && ap.right instanceof name) {
+      displayedLeft = displayApplication(ap.left, selection);
+      displayedRight = displayWord(ap.right, selection);
+    } else if (ap.left instanceof application && ap.right instanceof application) {
+      displayedLeft = displayApplication(ap.left, selection);
+      displayedRight = displayApplicationWithParens(ap.right, selection);
+    }
+    let printed = displayedLeft.concat(space, displayedRight);
+    if (ap === selection) {
+      return selectList(printed);
+    } else {
+      return printed;
+    }
+  }
+  function displayApplicationWithParens(ap, selection) {
+    let leftParens = displayString("(", "black", selection === ap);
+    let inner = displayApplication(ap, selection);
+    let rightParens = displayString(")", "black", selection === ap);
+    return leftParens.concat(inner, rightParens);
+  }
+  function selectChar(char) {
+    return new displayChar(char.key, char.color, true);
+  }
+  function selectList(chars) {
+    return chars.map(selectChar);
+  }
+  function displayStatement(st, selection) {
+    let letKeyword = displayString(" = ", "black", false);
+    let displayedName = displayWord(st.name, selection);
+    let displayedVal = [];
+    if (st.value instanceof name) {
+      displayedVal = displayWord(st.value, selection);
+    } else if (st.value instanceof application) {
+      displayedVal = displayApplication(st.value, selection);
+    }
+    let unhighlighted = displayedName.concat(letKeyword, displayedVal);
+    if (st === selection) {
+      return selectList(unhighlighted);
+    } else {
+      return unhighlighted;
+    }
+  }
+  function displayDefHeader(def, selection) {
+    let defKeyword = displayString("define ", "green", false);
+    let name2 = displayWord(def.name, selection);
+    let params = displayList(def.parameters, selection);
+    let space = displayString(" ", "black", false);
+    return defKeyword.concat(name2, space, params);
+  }
+  function displayList(params, selection) {
+    let space = displayString(" ", "black", false);
+    if (params.length == 0) {
+      return [];
+    } else {
+      let displayedParams = displayWord(params[0], selection);
+      for (let i = 1; i < params.length; i++) {
+        let displayedWord = displayWord(params[i], selection);
+        displayedParams = displayedParams.concat(space, displayedWord);
       }
-      setTextColorAt(row, x + i, color2);
-      setCharAt(row, x + i, word.content[i].content);
-    }
-  }
-  function printAndHighlightWord(word, row, x) {
-    if (word.content.length == 0) {
-      highlightAt(row, x);
-    }
-    for (let i = 0; i < word.content.length; i++) {
-      setCharAt(row, x + i, word.content[i].content);
-      highlightAt(row, x + i);
+      return displayedParams;
     }
   }
 
@@ -482,6 +541,7 @@
       updateTable(currentMode);
     } else {
       currentSelection = handleInput(key, currentSelection, currentMode);
+      clearDisplay(documentHeight, documentWidth);
       printModule(documentNode, currentSelection);
     }
   }

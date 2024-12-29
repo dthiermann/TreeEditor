@@ -18,182 +18,6 @@ function getColor(key : string) : color {
     
 }
 
-function printExpression(expr : expression, row : number, x : number, color : color, selection : expression) {
-    if (expr instanceof defName) {
-
-        
-    }
-}
-// print String to the ui directly
-// requires string to fit in row
-function printString(str : string, row : number, x: number, color: color) {
-    for (let i = 0; i < str.length; i++) {
-        setTextColorAt(row, x + i, color);
-        setCharAt(row, x + i, str[i]);
-        
-    }
-}
-
-function printAndHighlightString(str : string, row : number, x: number, color : color) {
-    for (let i = 0; i < str.length; i++) {
-        setTextColorAt(row, x + i, color);
-        setCharAt(row, x + i, str[i]);
-        highlightAt(row, x + i);
-        
-    }
-}
-
-
-function copyArrayToPosition(textArray : string[], newRow : number, newStart : number) {
-    for (let i = 0; i < textArray.length; i ++) {
-        setCharAt(newRow, newStart + i, textArray[i]);
-    }
-}
-
-
-// prints the first def child of mod
-// doesn't highlight any children, even if they are selected
-export function printModule(mod : module, selectedNode : expression) {
-    if (mod.children.length == 0) {
-
-    }
-    else if (mod.children[0] === selectedNode) {
-        printAndHighlightDef(mod.children[0]);
-    }
-    else {
-        printDef(mod.children[0], selectedNode);
-    }
-}
-
-
-// print def and check children to see if any are the selection
-// if they are, highlights them,
-function printDef(def : definition, selectedNode : expression) {
-    clearDisplay(documentHeight, documentWidth);
-
-    printString(defKeyWord, 0, 0, getColor("defKeyword"));
-
-    let name = def.name;
-
-    let nameList : word[] = [name];
-    let parameters = def.parameters as word[];
-
-    let restOfLine = nameList.concat(parameters);
-   
-    printListOfWords(restOfLine, 0, defKeyWord.length, selectedNode);
-
-}
-// printing a def
-// defKeyWord + name + params
-// indent --> body
-function printAndHighlightDef(def : definition) {
-    clearDisplay(documentHeight, documentWidth);
-    printAndHighlightString(defKeyWord, 0, 0, getColor("defKeyword"));
-
-    let name = def.name;
-
-    let nameList : word[] = [name];
-    let parameters = def.parameters as word[];
-
-    let restOfLine = nameList.concat(parameters);
-   
-    printAndHighlightListOfWords(restOfLine, 0, defKeyWord.length);
-}
-
-function printAndHighlightListOfWords(words : word[], row: number, x: number) {
-    let position = x;
-    words.forEach(word => {
-        printAndHighlightWord(word, row, position);
-        highlightAt(row, position + 1);
-        let printingLength = Math.max(1, word.content.length);
-        position = position + printingLength + 1;
-    })
-}
-
-// should print a list of words on one line, separating them by spaces
-// if word is empty, should give it a space
-function printListOfWords(words : word[], row: number, x: number, selectedNode : expression) {
-    let position = x;
-    words.forEach(word => {
-        if (word === selectedNode) {
-            printAndHighlightWord(word, row, position);
-        }
-        else {
-            printWord(word, row, position, selectedNode);
-        }
-
-        let printingLength = Math.max(1, word.content.length);
-        position = position + printingLength + 1;
-    })
-}
-
-
-
-// prints word and highlights any selected letters
-// empty words should be printed as " "
-function printWord(word : word, row : number, x : number, selectedNode : expression) {
-    let color = getColor(word.constructor.name);
-    for (let i = 0; i < word.content.length; i ++) {
-        if (word.content[i] === selectedNode) {
-            highlightAt(row, x + i);
-        }
-        setTextColorAt(row, x + i, color);
-        setCharAt(row, x + i, word.content[i].content);
-    }
-    
-}
-
-// prints and highlights entire word
-function printAndHighlightWord(word : word, row : number, x : number) {
-    if (word.content.length == 0) {
-        highlightAt(row, x);
-    }
-    for (let i = 0; i < word.content.length; i ++) {
-        setCharAt(row, x + i, word.content[i].content);
-        highlightAt(row, x + i);
-    }
-}
-
-// print a list of statements, one on each line, with an indent
-function printBody(body : statement[], indent : number, startingRow : number, selection : expression) {
-    for (let i = 0; i < body.length; i++) {
-        printLine(body[i], indent, startingRow + i, selection );
-    }
-}
-
-
-
-
-type stringOrWord = string | defName | name | parameter;
-
-// function that takes in a list of (string | word)
-// and prints them one after the other, highlighting the words if they are the selected node
-// alternatively, first convert string or word to a printobject with color, highlighted?, string attributes
-function printInARow(words : stringOrWord[], row : number, x : number, selection : expression) {
-    let start = 0;
-    for (let i = 0; i < words.length; i++) {
-        let word = words[i];
-        if (typeof word === "string") {
-            printString(word, row, start, "black");
-            start = start + word.length;
-        }
-        else {
-            printWord(word, row, start, selection);
-            start = start + word.content.length;
-        }
-        
-    }
-}
-
-
-function printApplication(ap : application) {
-    let leftName = ap.left instanceof name;
-    let rightName = ap.right instanceof name;
-    if (leftName && rightName) {
-        [ap.left, " ", ap.right];
-    }
-}
-
 class displayChar {
     key: string;
     color: color;
@@ -206,6 +30,44 @@ class displayChar {
     }
 }
 
+
+// prints the first def child of mod
+// doesn't highlight any children, even if they are selected
+export function printModule(mod : module, selectedNode : expression) {
+    if (mod.children.length == 0) {
+
+    }
+    else {
+        printDef(mod.children[0], 0, selectedNode);
+    }
+}
+
+function printDef(def : definition, row : number, selection : expression) {
+    let header = displayDefHeader(def, selection);
+    printLine(row, 0, header);
+    printBody(def.body, row + 1, selection);
+}
+
+// print a list of statements, one on each line, with an indent
+function printBody(body : statement[], startingRow : number, selection : expression) {
+   for (let i = 0; i < body.length; i++) {
+    let displayedLine = displayStatement(body[i], selection);
+    printLine(startingRow + i, 4, displayedLine);
+   }
+}
+
+function printLine(row : number, indent : number, chars : displayChar[]) {
+    for (let i = 0; i < chars.length; i++) {
+        setTextColorAt(row, i + indent, chars[i].color);
+        setCharAt(row, i + indent, chars[i].key);
+        if (chars[i].selected) {
+            highlightAt(row, i + indent);
+        }
+    }
+}
+
+
+
 // functions from expression types to displayChar[]
 // each display function checks if the inputted expression is selected
 // if it is selected, the display function sets all of the outputed displayChars to selected
@@ -217,31 +79,30 @@ function displayLetter(a : letter, color : color, selection : expression) : disp
     return new displayChar(a.content, color, a === selection);
 }
 
+// todo: empty word should be displayed as a space (possibly selected)
 function displayWord(myWord : word, selection : expression) : displayChar[] {
     let color = getColor(myWord.constructor.name);
     let selected = myWord === selection;
 
-    if (selected) {
-        return myWord.content.map(letter => 
-            new displayChar(letter.content, color, true)
-        )
+    if (myWord.content.length == 0) {
+        return displayString(" ", color, selected);
     }
     else {
-        return myWord.content.map(letter =>
-            displayLetter(letter, color, selection)
-        )
+        return myWord.content.map(char => 
+            displayLetter(char, color, selection)
+        );
     }
 }
 
-function displayString(str : string, selected : boolean) {
+function displayString(str : string, color : color, selected : boolean) {
     let stringList = Array.from(str);
     return stringList.map(char =>
-        new displayChar(char, "black", selected));
+        new displayChar(char, color, selected));
 }
 
 // displays application without enclosing parens
 function displayApplication(ap : application, selection : expression) : displayChar[] {
-    let space = displayString(" ", false);
+    let space = displayString(" ", "black", false);
     let displayedLeft : displayChar[] = [];
     let displayedRight : displayChar[] = [];
     if (ap.left instanceof name && ap.right instanceof name) {
@@ -272,9 +133,9 @@ function displayApplication(ap : application, selection : expression) : displayC
 
 // print application with enclosing parens
 function displayApplicationWithParens(ap : application, selection: expression) : displayChar[] {
-    let leftParens = displayString("(", selection === ap);
+    let leftParens = displayString("(", "black", selection === ap);
     let inner = displayApplication(ap, selection);
-    let rightParens = displayString(")", selection === ap);
+    let rightParens = displayString(")", "black", selection === ap);
     return leftParens.concat(inner, rightParens);
 }
 
@@ -286,3 +147,53 @@ function selectList(chars : displayChar[]) : displayChar[] {
     return chars.map(selectChar);
 }
 
+function displayStatement(st : statement, selection : expression) : displayChar[] {
+    let letKeyword = displayString(" = ", "black", false);
+    //  st.name " = " st.value
+    let displayedName = displayWord(st.name, selection);
+    let displayedVal : displayChar[] = [];
+    if (st.value instanceof name) {
+        displayedVal = displayWord(st.value, selection);
+    }
+    else if (st.value instanceof application) {
+        displayedVal = displayApplication(st.value, selection);
+    }
+
+    let unhighlighted = displayedName.concat(letKeyword, displayedVal);
+
+    if (st === selection) {
+        return selectList(unhighlighted);
+    }
+    else {
+        return unhighlighted;
+    }
+}
+
+function displayDefHeader(def : definition, selection : expression) : displayChar[] {
+    let defKeyword = displayString("define ", "green", false);
+
+    let name = displayWord(def.name, selection);
+    let params = displayList(def.parameters, selection);
+
+    let space = displayString(" ", "black", false);
+
+    return defKeyword.concat(name, space, params);
+}
+
+// will display a list of params, separated by spaces
+function displayList(params : parameter[], selection : expression) : displayChar[] {
+    let space = displayString(" ", "black", false);
+
+    // put a space before very param, except the first one
+    if (params.length == 0) {
+        return [];
+    }
+    else {
+        let displayedParams = displayWord(params[0], selection);
+        for (let i = 1; i < params.length; i++) {
+            let displayedWord = displayWord(params[i], selection);
+            displayedParams = displayedParams.concat(space, displayedWord);
+        }
+        return displayedParams;
+    }
+}
