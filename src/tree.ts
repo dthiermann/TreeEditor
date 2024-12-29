@@ -98,8 +98,8 @@ export type expr = name | application;
 
 export class application {
     kind: string;
-    left: expr;
-    right: expr;
+    left: name | application;
+    right: name | application;
     parent: application | statement;
 
     constructor(parent: application | statement) {
@@ -152,7 +152,7 @@ insertMap.set("ArrowLeft", doNothing);
 insertMap.set("ArrowRight", doNothing);
 insertMap.set("ArrowDown", doNothing);
 insertMap.set(" ", insertSpace);
-insertMap.set("Enter", doNothing);
+insertMap.set("Enter", insertLineBelow);
 
 
 
@@ -254,26 +254,19 @@ function deleteNode(node : expression) {
 // for a node in a list, get its index
 // every letter is in a word which has a list of letters
 // every parameter is in a list of parameters
-function getIndexInList(child : letter | parameter) : number {
+function getIndexInList(child : letter | parameter | statement) : number {
     if (child instanceof letter) {
-        return getLetterList(child).indexOf(child);
+        return child.parent.content.indexOf(child);
     }
     if (child instanceof parameter) {
-        return getParameterList(child).indexOf(child);
+        return child.parent.parameters.indexOf(child);
+    }
+    if (child instanceof statement) {
+        return child.parent.body.indexOf(child);
     }
     else {
         return -1;
     }
-}
-
-
-
-function getLetterList(child: letter) : letter[] {
-    return child.parent.content;
-}
-
-function getParameterList(child: parameter) : parameter[] {
-    return child.parent.parameters;
 }
 
 // if node has a rightSibling, return it,
@@ -435,11 +428,6 @@ function insertNewParamAtStart(selection: letter) : expression {
 
 // need a backend to start saving the work
 
-// newState = transition oldState inputKey
-// newUi = print newState
-// type state = (tree, selection, mode)
-// (oldTree, oldSelection, oldMode, key) -->(newTree, newSelection, newMode)
-// 
 
 // need to be able to write comments
 // def main event
@@ -449,31 +437,52 @@ function insertNewParamAtStart(selection: letter) : expression {
 // first get the editor to the point where you can write
 // the above text in the above format
 
+// if selection is in the header line of def,
+// want to be able to hit enter to add a new line to the start of body
+// and start editing
 
+function insertLineBelow(selection : expression) : expression {
+    if (selection instanceof defName || selection instanceof parameter) {
+        return insertLineAtIndexInBody(selection.parent, 0);
+    }
+    if (selection instanceof statement) {
+        let i = getIndexInList(selection);
+        return insertLineAtIndexInBody(selection.parent, i + 1);
+    }
+    else {
+        return selection;
+    }
+}
 
-function insertLineAtIndexInBody(def : definition, index : number) {
-    
+function insertLineAtIndexInBody(def : definition, index : number) : expression {
+    let line = new statement(def);
+    def.body.splice(index, 0, line);
+    return line;
 
 }
 
 // TO DO
-// be able to highlight whole def when its selected
+// adding a new line to body of def
+// print body of def
 
 // changing selection
 // left sibling, right sibling, parent, firstchild
 // if can't go further in some direction, want to stay on current selection
 
-// inserting nodes
+// inserting nodes:
+// insert sibling to the right
+// insert sibling to the left
+// insert child node at end of children
+// insert child node at beginning of children
+
+
+// delete selected node
+
+// simple standardized tree structure for def
+// def.children = [name, arguments, body]
+// arguments.children = [arg1, arg2 ... ] <-- can insert and delete
+// body.children = [line1, line2, ...] <--- can insert and delete
+
+
+// goal: insert new line at start of body
 // 
-
-// deleting nodes
-
-// rendering: being able to highlight defs
-// being able to highlight any 
-
-// maybe try just making a uniform tree editor
-
-// parent
-//   parent
-//     child1
-//     child2

@@ -53,6 +53,27 @@
       this.children = [];
     }
   };
+  var statement = class {
+    kind;
+    name;
+    value;
+    parent;
+    constructor(parent) {
+      this.parent = parent;
+      this.kind = "statement";
+      this.name = new name(this);
+    }
+  };
+  var name = class {
+    kind;
+    content;
+    parent;
+    constructor(parent) {
+      this.kind = "name";
+      this.content = [];
+      this.parent = parent;
+    }
+  };
   var commandMap = /* @__PURE__ */ new Map();
   commandMap.set("f", addNewChild);
   commandMap.set("p", selectParent);
@@ -70,7 +91,7 @@
   insertMap.set("ArrowRight", doNothing);
   insertMap.set("ArrowDown", doNothing);
   insertMap.set(" ", insertSpace);
-  insertMap.set("Enter", doNothing);
+  insertMap.set("Enter", insertLineBelow);
   function insertAtSelectionInTree(key, selection) {
     if (selection instanceof letter) {
       return insertAtLetterInTree(key, selection);
@@ -134,19 +155,16 @@
   }
   function getIndexInList(child) {
     if (child instanceof letter) {
-      return getLetterList(child).indexOf(child);
+      return child.parent.content.indexOf(child);
     }
     if (child instanceof parameter) {
-      return getParameterList(child).indexOf(child);
+      return child.parent.parameters.indexOf(child);
+    }
+    if (child instanceof statement) {
+      return child.parent.body.indexOf(child);
     } else {
       return -1;
     }
-  }
-  function getLetterList(child) {
-    return child.parent.content;
-  }
-  function getParameterList(child) {
-    return child.parent.parameters;
   }
   function getRightSibling(node) {
     if (node instanceof defName) {
@@ -253,6 +271,22 @@
       return selection;
     }
   }
+  function insertLineBelow(selection) {
+    if (selection instanceof defName || selection instanceof parameter) {
+      return insertLineAtIndexInBody(selection.parent, 0);
+    }
+    if (selection instanceof statement) {
+      let i = getIndexInList(selection);
+      return insertLineAtIndexInBody(selection.parent, i + 1);
+    } else {
+      return selection;
+    }
+  }
+  function insertLineAtIndexInBody(def, index) {
+    let line = new statement(def);
+    def.body.splice(index, 0, line);
+    return line;
+  }
 
   // src/lowlevel.ts
   function clearDisplay(documentHeight2, documentWidth2) {
@@ -339,8 +373,8 @@
   function printDef(def, selectedNode) {
     clearDisplay(documentHeight, documentWidth);
     printString(defKeyWord, 0, 0, getColor("defKeyword"));
-    let name = def.name;
-    let nameList = [name];
+    let name2 = def.name;
+    let nameList = [name2];
     let parameters = def.parameters;
     let restOfLine = nameList.concat(parameters);
     printListOfWords(restOfLine, 0, defKeyWord.length, selectedNode);
@@ -348,8 +382,8 @@
   function printAndHighlightDef(def) {
     clearDisplay(documentHeight, documentWidth);
     printAndHighlightString(defKeyWord, 0, 0, getColor("defKeyword"));
-    let name = def.name;
-    let nameList = [name];
+    let name2 = def.name;
+    let nameList = [name2];
     let parameters = def.parameters;
     let restOfLine = nameList.concat(parameters);
     printAndHighlightListOfWords(restOfLine, 0, defKeyWord.length);

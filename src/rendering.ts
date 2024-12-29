@@ -1,5 +1,5 @@
 import {color, setTextColorAt, setCharAt, clearDisplay, highlightAt, unhighlightAt } from "./lowlevel"
-import {expression, module, definition, word , defName } from "./tree"
+import {expression, letter, module, definition, word, defName, parameter, name, statement, application, } from "./tree"
 import {documentHeight, documentWidth, defKeyWord } from "./main"
 
 
@@ -18,6 +18,12 @@ function getColor(key : string) : color {
     
 }
 
+function printExpression(expr : expression, row : number, x : number, color : color, selection : expression) {
+    if (expr instanceof defName) {
+
+        
+    }
+}
 // print String to the ui directly
 // requires string to fit in row
 function printString(str : string, row : number, x: number, color: color) {
@@ -148,7 +154,135 @@ function printAndHighlightWord(word : word, row : number, x : number) {
     }
 }
 
-// printing and highlighting
-// to print and highlight def
-// need to print and highlight list of words
-// 
+// print a list of statements, one on each line, with an indent
+function printBody(body : statement[], indent : number, startingRow : number, selection : expression) {
+    for (let i = 0; i < body.length; i++) {
+        printLine(body[i], indent, startingRow + i, selection );
+    }
+}
+
+
+
+
+type stringOrWord = string | defName | name | parameter;
+
+// function that takes in a list of (string | word)
+// and prints them one after the other, highlighting the words if they are the selected node
+// alternatively, first convert string or word to a printobject with color, highlighted?, string attributes
+function printInARow(words : stringOrWord[], row : number, x : number, selection : expression) {
+    let start = 0;
+    for (let i = 0; i < words.length; i++) {
+        let word = words[i];
+        if (typeof word === "string") {
+            printString(word, row, start, "black");
+            start = start + word.length;
+        }
+        else {
+            printWord(word, row, start, selection);
+            start = start + word.content.length;
+        }
+        
+    }
+}
+
+
+function printApplication(ap : application) {
+    let leftName = ap.left instanceof name;
+    let rightName = ap.right instanceof name;
+    if (leftName && rightName) {
+        [ap.left, " ", ap.right];
+    }
+}
+
+class displayChar {
+    key: string;
+    color: color;
+    selected: boolean;
+
+    constructor(key : string, color : color, selected : boolean) {
+        this.key = key;
+        this.color = color;
+        this.selected = selected;
+    }
+}
+
+// functions from expression types to displayChar[]
+// each display function checks if the inputted expression is selected
+// if it is selected, the display function sets all of the outputed displayChars to selected
+// otherwise, 
+
+
+// ensures that if letter is the selection, it gets highlighted
+function displayLetter(a : letter, color : color, selection : expression) : displayChar {
+    return new displayChar(a.content, color, a === selection);
+}
+
+function displayWord(myWord : word, selection : expression) : displayChar[] {
+    let color = getColor(myWord.constructor.name);
+    let selected = myWord === selection;
+
+    if (selected) {
+        return myWord.content.map(letter => 
+            new displayChar(letter.content, color, true)
+        )
+    }
+    else {
+        return myWord.content.map(letter =>
+            displayLetter(letter, color, selection)
+        )
+    }
+}
+
+function displayString(str : string, selected : boolean) {
+    let stringList = Array.from(str);
+    return stringList.map(char =>
+        new displayChar(char, "black", selected));
+}
+
+// displays application without enclosing parens
+function displayApplication(ap : application, selection : expression) : displayChar[] {
+    let space = displayString(" ", false);
+    let displayedLeft : displayChar[] = [];
+    let displayedRight : displayChar[] = [];
+    if (ap.left instanceof name && ap.right instanceof name) {
+        displayedLeft = displayWord(ap.left, selection);
+        displayedRight = displayWord(ap.right, selection);
+    }
+    else if (ap.left instanceof name && ap.right instanceof application) {
+        displayedLeft = displayWord(ap.left, selection);
+        displayedRight = displayApplicationWithParens(ap.right, selection);
+    }
+    else if (ap.left instanceof application && ap.right instanceof name) {
+        displayedLeft = displayApplication(ap.left, selection);
+        displayedRight = displayWord(ap.right, selection);
+    }
+    else if (ap.left instanceof application && ap.right instanceof application) {
+        displayedLeft = displayApplication(ap.left, selection);
+        displayedRight = displayApplicationWithParens(ap.right, selection);
+    }
+    let printed = displayedLeft.concat(space, displayedRight);
+
+    if (ap === selection) {
+        return selectList(printed);
+    }
+    else {
+        return printed;
+    }
+}
+
+// print application with enclosing parens
+function displayApplicationWithParens(ap : application, selection: expression) : displayChar[] {
+    let leftParens = displayString("(", selection === ap);
+    let inner = displayApplication(ap, selection);
+    let rightParens = displayString(")", selection === ap);
+    return leftParens.concat(inner, rightParens);
+}
+
+
+function selectChar(char : displayChar) : displayChar {
+    return new displayChar(char.key, char.color, true);
+}
+function selectList(chars : displayChar[]) : displayChar[] {
+    return chars.map(selectChar);
+}
+
