@@ -198,8 +198,13 @@ function displayDef(def : definition, selection : expression) : displayChar[][] 
         display.push(displayStatement(st, selection));
     }
 
-    return display;
-
+    if (def === selection) {
+        return highlightBlock(display);
+        
+    }
+    else {
+        return display;
+    }
 }
 
 // will display a list of params, separated by spaces
@@ -218,4 +223,12 @@ function displayList(params : parameter[], selection : expression) : displayChar
         }
         return displayedParams;
     }
+}
+
+function highlightLine(line : displayChar[]) : displayChar[] {
+    return line.map(selectChar);
+}
+
+function highlightBlock(block : displayChar[][]) : displayChar[][] {
+    return block.map(highlightLine);
 }

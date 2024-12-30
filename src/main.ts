@@ -87,7 +87,6 @@ function main(e : KeyboardEvent) {
         currentSelection = handleInput(key, currentSelection, currentMode);
         clearDisplay(documentHeight, documentWidth);
         printModule(documentNode, currentSelection);
-        console.log(currentSelection);
 
     }
 }

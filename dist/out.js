@@ -378,15 +378,8 @@
     }
   }
   function printDef(def, row, selection) {
-    const header = displayDefHeader(def, selection);
-    printLine(row, 0, header);
-    printBody(def.body, row + 1, selection);
-  }
-  function printBody(body, startingRow, selection) {
-    for (let i = 0; i < body.length; i++) {
-      let displayedLine = displayStatement(body[i], selection);
-      printLine(startingRow + i, 4, displayedLine);
-    }
+    let displayed = displayDef(def, selection);
+    printBlock(0, displayed);
   }
   function printLine(row, indent, chars) {
     for (let i = 0; i < chars.length; i++) {
@@ -395,6 +388,11 @@
       if (chars[i].selected) {
         highlightAt(row, i + indent);
       }
+    }
+  }
+  function printBlock(startingRow, block) {
+    for (let i = 0; i < block.length; i++) {
+      printLine(startingRow + i, 0, block[i]);
     }
   }
   function displayLetter(a, color3, selection) {
@@ -479,6 +477,22 @@
     const space = displayString(" ", "black", false);
     return defKeyword.concat(name2, space, params);
   }
+  function displayDef(def, selection) {
+    let display = [];
+    display.push(displayDefHeader(def, selection));
+    for (const st of def.body) {
+      const isSelected = st === selection;
+      const space = new displayChar(" ", "black", isSelected);
+      const indent = new Array(4).fill(space);
+      const line = indent.concat(displayStatement(st, selection));
+      display.push(displayStatement(st, selection));
+    }
+    if (def === selection) {
+      return highlightBlock(display);
+    } else {
+      return display;
+    }
+  }
   function displayList(params, selection) {
     const space = displayString(" ", "black", false);
     if (params.length == 0) {
@@ -491,6 +505,12 @@
       }
       return displayedParams;
     }
+  }
+  function highlightLine(line) {
+    return line.map(selectChar);
+  }
+  function highlightBlock(block) {
+    return block.map(highlightLine);
   }
 
   // src/main.ts
