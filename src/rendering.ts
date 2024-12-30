@@ -1,6 +1,5 @@
-import {color, setTextColorAt, setCharAt, clearDisplay, highlightAt, unhighlightAt } from "./lowlevel"
-import {expression, letter, module, definition, word, defName, parameter, name, statement, application, } from "./tree"
-import {documentHeight, documentWidth, defKeyWord } from "./main"
+import { color, highlightAt, setCharAt, setTextColorAt } from "./lowlevel";
+import { application, definition, expression, letter, module, name, parameter, statement, word } from "./tree";
 
 
 let colorTable : Map<string, color> = new Map();
@@ -43,18 +42,10 @@ export function printModule(mod : module, selectedNode : expression) {
 }
 
 function printDef(def : definition, row : number, selection : expression) {
-    let header = displayDefHeader(def, selection);
-    printLine(row, 0, header);
-    printBody(def.body, row + 1, selection);
+    let displayed = displayDef(def, selection);
+    printBlock(0, displayed);
 }
 
-// print a list of statements, one on each line, with an indent
-function printBody(body : statement[], startingRow : number, selection : expression) {
-   for (let i = 0; i < body.length; i++) {
-    let displayedLine = displayStatement(body[i], selection);
-    printLine(startingRow + i, 4, displayedLine);
-   }
-}
 
 function printLine(row : number, indent : number, chars : displayChar[]) {
     for (let i = 0; i < chars.length; i++) {
@@ -63,6 +54,12 @@ function printLine(row : number, indent : number, chars : displayChar[]) {
         if (chars[i].selected) {
             highlightAt(row, i + indent);
         }
+    }
+}
+
+function printBlock(startingRow : number, block : displayChar[][]) {
+    for (let i = 0; i < block.length; i++) {
+        printLine(startingRow + i, 0, block[i]);
     }
 }
 
@@ -79,23 +76,32 @@ function displayLetter(a : letter, color : color, selection : expression) : disp
     return new displayChar(a.content, color, a === selection);
 }
 
-// todo: empty word should be displayed as a space (possibly selected)
+// empty word should be displayed as a space (possibly selected)
 function displayWord(myWord : word, selection : expression) : displayChar[] {
-    let color = getColor(myWord.constructor.name);
-    let selected = myWord === selection;
+    const color = getColor(myWord.constructor.name);
+    const selected = myWord === selection;
+    // use displayLetter on each letter of word to create the displayedword
+    // this will highlight any letters if they are the selection
 
+    // want empty word to be displayed as a space:
     if (myWord.content.length == 0) {
-        return displayString(" ", color, selected);
+        return [new displayChar(" ", color, selected)];
+    }
+
+    if (selected) {
+        return myWord.content.map(letter =>
+            new displayChar(letter.content, color, true)
+        );
     }
     else {
-        return myWord.content.map(char => 
-            displayLetter(char, color, selection)
+        return myWord.content.map(letter =>
+            displayLetter(letter, color, selection)
         );
     }
 }
 
 function displayString(str : string, color : color, selected : boolean) {
-    let stringList = Array.from(str);
+    const stringList = Array.from(str);
     return stringList.map(char =>
         new displayChar(char, color, selected));
 }
@@ -121,7 +127,7 @@ function displayApplication(ap : application, selection : expression) : displayC
         displayedLeft = displayApplication(ap.left, selection);
         displayedRight = displayApplicationWithParens(ap.right, selection);
     }
-    let printed = displayedLeft.concat(space, displayedRight);
+    const printed = displayedLeft.concat(space, displayedRight);
 
     if (ap === selection) {
         return selectList(printed);
@@ -133,9 +139,9 @@ function displayApplication(ap : application, selection : expression) : displayC
 
 // print application with enclosing parens
 function displayApplicationWithParens(ap : application, selection: expression) : displayChar[] {
-    let leftParens = displayString("(", "black", selection === ap);
-    let inner = displayApplication(ap, selection);
-    let rightParens = displayString(")", "black", selection === ap);
+    const leftParens = displayString("(", "black", selection === ap);
+    const inner = displayApplication(ap, selection);
+    const rightParens = displayString(")", "black", selection === ap);
     return leftParens.concat(inner, rightParens);
 }
 
@@ -170,19 +176,35 @@ function displayStatement(st : statement, selection : expression) : displayChar[
 }
 
 function displayDefHeader(def : definition, selection : expression) : displayChar[] {
-    let defKeyword = displayString("define ", "green", false);
+    const defKeyword = displayString("define ", "green", false);
 
-    let name = displayWord(def.name, selection);
-    let params = displayList(def.parameters, selection);
+    const name = displayWord(def.name, selection);
+    const params = displayList(def.parameters, selection);
 
-    let space = displayString(" ", "black", false);
+    const space = displayString(" ", "black", false);
 
     return defKeyword.concat(name, space, params);
 }
 
+function displayDef(def : definition, selection : expression) : displayChar[][] {
+    let display = [];
+    
+    display.push(displayDefHeader(def, selection));
+    for (const st of def.body) {
+        const isSelected = st === selection;
+        const space = new displayChar(" ", "black", isSelected);
+        const indent = new Array(4).fill(space);
+        const line = indent.concat(displayStatement(st, selection))
+        display.push(displayStatement(st, selection));
+    }
+
+    return display;
+
+}
+
 // will display a list of params, separated by spaces
 function displayList(params : parameter[], selection : expression) : displayChar[] {
-    let space = displayString(" ", "black", false);
+    const space = displayString(" ", "black", false);
 
     // put a space before very param, except the first one
     if (params.length == 0) {

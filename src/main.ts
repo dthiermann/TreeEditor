@@ -84,10 +84,10 @@ function main(e : KeyboardEvent) {
     }
     else {
         // key changes tree and selection --> update textbox
-
         currentSelection = handleInput(key, currentSelection, currentMode);
         clearDisplay(documentHeight, documentWidth);
         printModule(documentNode, currentSelection);
+        console.log(currentSelection);
 
     }
 }

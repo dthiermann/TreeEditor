@@ -378,7 +378,7 @@
     }
   }
   function printDef(def, row, selection) {
-    let header = displayDefHeader(def, selection);
+    const header = displayDefHeader(def, selection);
     printLine(row, 0, header);
     printBody(def.body, row + 1, selection);
   }
@@ -401,18 +401,23 @@
     return new displayChar(a.content, color3, a === selection);
   }
   function displayWord(myWord, selection) {
-    let color3 = getColor(myWord.constructor.name);
-    let selected = myWord === selection;
+    const color3 = getColor(myWord.constructor.name);
+    const selected = myWord === selection;
     if (myWord.content.length == 0) {
-      return displayString(" ", color3, selected);
+      return [new displayChar(" ", color3, selected)];
+    }
+    if (selected) {
+      return myWord.content.map(
+        (letter3) => new displayChar(letter3.content, color3, true)
+      );
     } else {
       return myWord.content.map(
-        (char) => displayLetter(char, color3, selection)
+        (letter3) => displayLetter(letter3, color3, selection)
       );
     }
   }
   function displayString(str, color3, selected) {
-    let stringList = Array.from(str);
+    const stringList = Array.from(str);
     return stringList.map((char) => new displayChar(char, color3, selected));
   }
   function displayApplication(ap, selection) {
@@ -432,7 +437,7 @@
       displayedLeft = displayApplication(ap.left, selection);
       displayedRight = displayApplicationWithParens(ap.right, selection);
     }
-    let printed = displayedLeft.concat(space, displayedRight);
+    const printed = displayedLeft.concat(space, displayedRight);
     if (ap === selection) {
       return selectList(printed);
     } else {
@@ -440,9 +445,9 @@
     }
   }
   function displayApplicationWithParens(ap, selection) {
-    let leftParens = displayString("(", "black", selection === ap);
-    let inner = displayApplication(ap, selection);
-    let rightParens = displayString(")", "black", selection === ap);
+    const leftParens = displayString("(", "black", selection === ap);
+    const inner = displayApplication(ap, selection);
+    const rightParens = displayString(")", "black", selection === ap);
     return leftParens.concat(inner, rightParens);
   }
   function selectChar(char) {
@@ -468,14 +473,14 @@
     }
   }
   function displayDefHeader(def, selection) {
-    let defKeyword = displayString("define ", "green", false);
-    let name2 = displayWord(def.name, selection);
-    let params = displayList(def.parameters, selection);
-    let space = displayString(" ", "black", false);
+    const defKeyword = displayString("define ", "green", false);
+    const name2 = displayWord(def.name, selection);
+    const params = displayList(def.parameters, selection);
+    const space = displayString(" ", "black", false);
     return defKeyword.concat(name2, space, params);
   }
   function displayList(params, selection) {
-    let space = displayString(" ", "black", false);
+    const space = displayString(" ", "black", false);
     if (params.length == 0) {
       return [];
     } else {
@@ -543,6 +548,7 @@
       currentSelection = handleInput(key, currentSelection, currentMode);
       clearDisplay(documentHeight, documentWidth);
       printModule(documentNode, currentSelection);
+      console.log(currentSelection);
     }
   }
   function updateTable(currentMode2) {
