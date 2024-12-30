@@ -163,7 +163,7 @@ export function insertAtSelectionInTree(key : string, selection : expression) : 
     if (selection instanceof letter) {
         return insertAtLetterInTree(key, selection);
     }
-    else if (selection instanceof defName) {
+    else if (selection instanceof defName || selection instanceof name) {
         let newLetter = new letter(key, selection);
         selection.content = [newLetter];
         selection = newLetter;
@@ -449,6 +449,12 @@ function insertLineBelow(selection : expression) : expression {
         let i = getIndexInList(selection);
         return insertLineAtIndexInBody(selection.parent, i + 1);
     }
+    else if (selection instanceof letter && selection.parent instanceof parameter) {
+        return insertLineAtIndexInBody(selection.parent.parent, 0);
+    }
+    else if (selection instanceof letter && selection.parent instanceof defName) {
+        return insertLineAtIndexInBody(selection.parent.parent, 0);
+    }
     else {
         return selection;
     }
@@ -457,13 +463,20 @@ function insertLineBelow(selection : expression) : expression {
 function insertLineAtIndexInBody(def : definition, index : number) : expression {
     let line = new statement(def);
     def.body.splice(index, 0, line);
-    return line;
+    return line.name;
 
 }
 
 // TO DO
-// adding a new line to body of def
-// print body of def
+// adding a new line to body of def (insert mode)
+// the new-selection will be the statement name
+// typing will start adding to the statement name
+// (insert mode, selection type = name, key type = letter)
+// add key to name, and select key
+
+// 
+// when statement is selected and we are in insert mode
+// typing a letter should 
 
 // changing selection
 // left sibling, right sibling, parent, firstchild
@@ -483,6 +496,3 @@ function insertLineAtIndexInBody(def : definition, index : number) : expression 
 // arguments.children = [arg1, arg2 ... ] <-- can insert and delete
 // body.children = [line1, line2, ...] <--- can insert and delete
 
-
-// goal: insert new line at start of body
-// 

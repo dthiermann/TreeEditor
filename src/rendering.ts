@@ -195,7 +195,7 @@ function displayDef(def : definition, selection : expression) : displayChar[][] 
         const space = new displayChar(" ", "black", isSelected);
         const indent = new Array(4).fill(space);
         const line = indent.concat(displayStatement(st, selection))
-        display.push(displayStatement(st, selection));
+        display.push(line);
     }
 
     if (def === selection) {

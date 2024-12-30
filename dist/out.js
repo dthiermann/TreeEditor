@@ -107,7 +107,7 @@
   function insertAtSelectionInTree(key, selection) {
     if (selection instanceof letter) {
       return insertAtLetterInTree(key, selection);
-    } else if (selection instanceof defName) {
+    } else if (selection instanceof defName || selection instanceof name) {
       let newLetter = new letter(key, selection);
       selection.content = [newLetter];
       selection = newLetter;
@@ -290,6 +290,10 @@
     if (selection instanceof statement) {
       let i = getIndexInList(selection);
       return insertLineAtIndexInBody(selection.parent, i + 1);
+    } else if (selection instanceof letter && selection.parent instanceof parameter) {
+      return insertLineAtIndexInBody(selection.parent.parent, 0);
+    } else if (selection instanceof letter && selection.parent instanceof defName) {
+      return insertLineAtIndexInBody(selection.parent.parent, 0);
     } else {
       return selection;
     }
@@ -297,7 +301,7 @@
   function insertLineAtIndexInBody(def, index) {
     let line = new statement(def);
     def.body.splice(index, 0, line);
-    return line;
+    return line.name;
   }
 
   // src/lowlevel.ts
@@ -485,7 +489,7 @@
       const space = new displayChar(" ", "black", isSelected);
       const indent = new Array(4).fill(space);
       const line = indent.concat(displayStatement(st, selection));
-      display.push(displayStatement(st, selection));
+      display.push(line);
     }
     if (def === selection) {
       return highlightBlock(display);
@@ -568,7 +572,6 @@
       currentSelection = handleInput(key, currentSelection, currentMode);
       clearDisplay(documentHeight, documentWidth);
       printModule(documentNode, currentSelection);
-      console.log(currentSelection);
     }
   }
   function updateTable(currentMode2) {
