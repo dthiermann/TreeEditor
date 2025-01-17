@@ -1,0 +1,23 @@
+{
+    "compilerOptions": {
+        "noImplicitAny": true,
+        "noImplicitReturns": true,
+        "noPropertyAccessFromIndexSignature": true,
+        "strict": true,
+
+        "outDir": "dist",
+        "module": "nodenext",
+        "moduleResolution": "nodenext",
+        "esModuleInterop": true,
+
+        "customConditions": ["module"],
+
+        "allowArbitraryExtensions": true,
+        "verbatimModuleSyntax": false,
+
+        "isolatedModules": true,
+        "lib": ["ES2015", "DOM"],
+        "sourceMap": true,
+
+    }
+}
