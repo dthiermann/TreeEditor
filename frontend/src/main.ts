@@ -89,6 +89,9 @@ function main(e : KeyboardEvent) {
         printModule(documentNode, currentSelection);
 
     }
+
+    // send mode, selection, and displayed part of syntax tree to server
+    
 }
 
 
