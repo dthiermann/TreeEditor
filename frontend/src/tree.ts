@@ -6,12 +6,14 @@ export class defName {
     content: letter[];
     parent: definition;
 
-    // creates an empty defName and adds it to parent
-    constructor(parent : definition) {
+    constructor(parent : definition, contentString = "") {
         this.parent = parent;
         parent.name = this;
         this.content = [];
-
+        for (const char of contentString) {
+            const charNode = new letter(char, this);
+            this.content.push(charNode);
+        }
     }
 
 }
@@ -34,10 +36,15 @@ export class parameter {
     content: letter[];
     parent: definition;
 
-    constructor(parent : definition) {
+    constructor(parent : definition, contentString = "") {
         this.kind = "parameter";
         this.content = [];
         this.parent = parent;
+        for (const char of contentString) {
+            const charNode = new letter(char, this);
+            this.content.push(charNode);
+        }
+        this.parent.parameters.push(this);
     }
 }
 
@@ -88,9 +95,13 @@ export class constant {
     content: letter[];
     parent: application | statement;
 
-    constructor(parent : application | statement) {
+    constructor(parent : application | statement, contentString = "") {
         this.content = [];
         this.parent = parent;
+        for (const char of contentString) {
+            const charNode = new letter(char, this);
+            this.content.push(charNode);
+        }
     }
 }
 
@@ -102,10 +113,14 @@ export class name {
     content: letter[];
     parent: statement;
 
-    constructor(parent : statement) {
+    constructor(parent : statement, contentString = "") {
         this.kind = "name";
         this.content = [];
         this.parent = parent;
+        for (const char of contentString) {
+            const charNode = new letter(char, this);
+            this.content.push(charNode);
+        }
     }
 }
 

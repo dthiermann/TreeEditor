@@ -122,7 +122,7 @@ function sendToServer(node : expression, sel : expression, mode : mode) {
 // if obj, remove parent attribute if there is one
 //   then call removeParentNodes on all of the objects attributes
 // if the attribute is a string --> return the string
-function removeParentRefs(item : expression | expression[] | string) : any {
+export function removeParentRefs(item : expression | expression[] | string) : any {
     if (typeof item === "string") {
         return item;
     }
@@ -139,6 +139,14 @@ function removeParentRefs(item : expression | expression[] | string) : any {
         );
         return newExpr;
     }
+}
+
+
+// takes in a tree without parent refs
+// node = {kind: string, children: node[]}
+// node.children.foreach(child -> add {parent: node} to child)
+function addParentRefsToChildren() {
+
 }
 
 
