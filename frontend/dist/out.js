@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // src/tree.ts
+  // frontend/src/tree.ts
   var defName = class {
     content;
     parent;
@@ -64,6 +64,14 @@
       this.name = new name(this);
     }
   };
+  var constant = class {
+    content;
+    parent;
+    constructor(parent) {
+      this.content = [];
+      this.parent = parent;
+    }
+  };
   var name = class {
     kind;
     content;
@@ -81,8 +89,8 @@
     parent;
     constructor(parent) {
       this.kind = "application";
-      this.left = new name(this);
-      this.right = new name(this);
+      this.left = new constant(this);
+      this.right = new constant(this);
       this.parent = parent;
     }
   };
@@ -119,14 +127,14 @@
     return selection;
   }
   function insertAtLetterInTree(key, selection) {
-    let word2 = selection.parent;
-    let i = getIndexInList(selection);
-    let newLetter = new letter(key, word2);
+    const word2 = selection.parent;
+    const i = getIndexInList(selection);
+    const newLetter = new letter(key, word2);
     word2.content.splice(i + 1, 0, newLetter);
     return newLetter;
   }
   function addBlankDef(document2) {
-    let blankdef = new definition(document2);
+    const blankdef = new definition(document2);
     document2.children.push(blankdef);
     return blankdef.name;
   }
@@ -139,31 +147,29 @@
   }
   function backSpace(selection) {
     if (selection instanceof letter) {
-      let i = getIndexInList(selection);
-      let newSelection = getLeftSibling(selection);
-      selection.parent.content.splice(i, 1);
-      if (selection.parent.content.length > 0) {
-        return newSelection;
-      } else {
-        return selection.parent;
-      }
+      return deleteNode(selection);
     }
     if (selection instanceof defName) {
       selection.content = [];
       return selection;
     }
     if (selection instanceof parameter) {
-      let leftSibling = getLeftSibling(selection);
-      deleteNode(selection);
-      return leftSibling;
+      return deleteNode(selection);
     } else {
       return selection;
     }
   }
-  function deleteNode(node) {
-    if (node instanceof defName) {
-      node.content = [];
+  function deleteNode(selection) {
+    const i = getIndexInList(selection);
+    let parentList;
+    if (selection instanceof parameter) {
+      parentList = selection.parent.parameters;
+    } else {
+      parentList = selection.parent.content;
     }
+    const leftSibling = getLeftSibling(selection);
+    parentList.splice(i, 1);
+    return leftSibling;
   }
   function getIndexInList(child) {
     if (child instanceof letter) {
@@ -304,7 +310,7 @@
     return line.name;
   }
 
-  // src/lowlevel.ts
+  // frontend/src/lowlevel.ts
   function clearDisplay(documentHeight2, documentWidth2) {
     for (let row = 0; row < documentHeight2; row++) {
       for (let x = 0; x < documentWidth2; x++) {
@@ -353,7 +359,7 @@
     }
   }
 
-  // src/rendering.ts
+  // frontend/src/rendering.ts
   var colorTable = /* @__PURE__ */ new Map();
   colorTable.set("defName", "red");
   colorTable.set("parameter", "blue");
@@ -517,7 +523,7 @@
     return block.map(highlightLine);
   }
 
-  // src/main.ts
+  // frontend/src/main.ts
   var container = document.createElement("div");
   document.body.appendChild(container);
   container.classList.add("container");
@@ -559,7 +565,21 @@
   var currentMode = "command";
   var currentSelection = documentNode;
   document.addEventListener("keydown", main);
-  function main(e) {
+  window.addEventListener("load", getContent);
+  async function getContent() {
+    console.log("hello");
+    try {
+      const response = await fetch("localhost:3000/content");
+      if (!response.ok) {
+        throw new Error(`Response status: ${response.status}`);
+      }
+      const json = await response.json();
+      console.log(json);
+    } catch (error) {
+      console.error(error.message);
+    }
+  }
+  async function main(e) {
     e.preventDefault();
     let key = e.key;
     if (currentMode === "command" && key === "i") {
@@ -573,6 +593,13 @@
       clearDisplay(documentHeight, documentWidth);
       printModule(documentNode, currentSelection);
     }
+    const myHeaders = new Headers();
+    myHeaders.append("Content-Type", "application/json");
+    const response = await fetch("/", {
+      method: "POST",
+      body: JSON.stringify(documentNode),
+      headers: myHeaders
+    });
   }
   function updateTable(currentMode2) {
     let currentTable = document.getElementsByClassName("commandTable")[0];

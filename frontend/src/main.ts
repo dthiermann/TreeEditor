@@ -1,6 +1,6 @@
 
-
-import { commandMap, insertMap, insertAtSelectionInTree, expression, module, definition, doNothing } from "./tree"
+import { commandMap, insertMap, insertAtSelectionInTree, doNothing} from "./tree"
+import {expression, module, definition, letter, defName} from "./tree"
 import { color , clearDisplay} from "./lowlevel"
 import { printModule } from "./rendering"
 
@@ -67,10 +67,28 @@ export let documentNode = new module();
 let currentMode : mode = "command";
 let currentSelection : expression = documentNode;
 
-document.addEventListener("keydown", main);
+document.addEventListener("keydown", keyboardInput);
+window.addEventListener("load", getContent);
 
-// this is the main entry point for the editor program
-function main(e : KeyboardEvent) {
+
+async function getContent() {
+    console.log("hello");
+    try {
+        const response = await fetch('localhost:3000/content');
+        if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+        }
+
+        const json = await response.json();
+        console.log(json);
+    }
+    catch (error : any) {
+        console.error(error.message);
+    }
+}
+
+// handle all keyboard input
+function keyboardInput(e : KeyboardEvent) {
     e.preventDefault();
     let key = e.key;
     // either key changes mode --> update table
@@ -87,12 +105,44 @@ function main(e : KeyboardEvent) {
         currentSelection = handleInput(key, currentSelection, currentMode);
         clearDisplay(documentHeight, documentWidth);
         printModule(documentNode, currentSelection);
+        sendToServer(documentNode, currentSelection, currentMode);
 
     }
 
-    // send mode, selection, and displayed part of syntax tree to server
-    
 }
+
+function sendToServer(node : expression, sel : expression, mode : mode) {
+    // remove parent refs from node
+    const newNode = removeParentRefs(node);
+
+}
+
+
+// everything is either a string or an object (and all of the objs are expressions?)
+// if obj, remove parent attribute if there is one
+//   then call removeParentNodes on all of the objects attributes
+// if the attribute is a string --> return the string
+function removeParentRefs(item : expression | expression[] | string) : any {
+    if (typeof item === "string") {
+        return item;
+    }
+    else if (Array.isArray(item)) {
+        return item.map(removeParentRefs);
+    }
+    else {
+        let newExpr : any = {};
+        Object.entries(item).forEach(([key, value]) => {
+            if (key != "parent") {
+                newExpr[key] = removeParentRefs(value);
+            }
+        }
+        );
+        return newExpr;
+    }
+}
+
+
+
 
 
 function updateTable(currentMode : mode) {
@@ -120,9 +170,21 @@ function handleInput(key : string, selection : expression, mode : mode) : expres
     }
 }
 
+// action = insert key | someothercommand
 
 function commandMode(key : string, selection : expression) : expression {
     let command = commandMap.get(key) ?? doNothing;
+    // send command.name to server
+    const myHeaders = new Headers();
+    myHeaders.append("Content-Type", "text/plain");
+
+    const response = fetch("/", {
+        method: "POST",
+        body: command.name,
+        headers: myHeaders,
+        
+    });
+
     return command(selection);
 }
 
@@ -132,9 +194,29 @@ function insertMode(key : string, selection : expression) : expression {
     
     let insertCommand = insertMap.get(key);
     if (insertCommand) {
+        // send insertCommand.name to server
+        const myHeaders = new Headers();
+        myHeaders.append("Content-Type", "text/plain");
+
+        const response = fetch("/", {
+            method: "POST",
+            body: insertCommand.name,
+            headers: myHeaders,
+        });
         return insertCommand(selection);
     }
     else {
+        // send "insertAtSelectionInTree key" to server
+        const myHeaders = new Headers();
+        myHeaders.append("Content-Type", "text/plain");
+
+        const commandString = `insertAtSelectionInTree ${key}`;
+        const response = fetch("/", {
+            method: "POST",
+            body: commandString,
+            headers: myHeaders,
+        })
+
         return insertAtSelectionInTree(key, selection);
     }
 }

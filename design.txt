@@ -1,0 +1,99 @@
+
+client:
+when user inputs key:
+update (tree, selection, mode) on client
+display client tree on ui wih selection and mode commands
+send command to server
+
+
+when page loads:
+request (tree, mode, selection) from server
+-get stripped tree from server
+-add in parent refs
+-follow selection address to get ref to selection
+-display tree on ui
+
+server:
+when receiving a command from client:
+update (tree, selection, mode)
+
+if client requests (tree, mode, selection):
+--take parent refs out of tree and send tree
+--send mode
+--send selection as list of ints (tree address)
+
+
+
+
+
+
+programs that I would want to write in my own language/editor:
+--math definitions and program that proves some theorems (+ computation/algebra system)
+--a wide variety of basic programs (ex: tic tac toe, )
+--machine learning library or my own llm
+
+backend:
+--stores the current state of the (code, mode, selection) in some form
+--when document loads, sends the (code, mode, selection) to frontend
+--for every key user inputs, gets updated version of the (code, mode, selection)
+--Implement Later:
+--store a list of user commands from this session (in order to implement undo)
+--get latest user command from frontend and add it to this list
+
+frontend:
+--when document loads, get (code, mode, selection) (in some form) from backend
+--after every user input, send (code, mode, selection) to backend
+--meanwhile, update (code, mode, selection) on frontend
+
+How to store and send (code, mode, selection), some possibilities:
+--code: json with parent refs removed, selection: address of selected node
+--code: actual text as it is displayed, selection: coordinates of selected text
+(would need to parse on document load)
+--code: list of nodes that all have an address, selection: address of selected node
+letter = {value: string, address: }
+word = {address}
+node = {address}
+
+Ways to store code:
+json/tree of objects
+text
+
+
+
+json is just a very verbose tree syntax, with a built in parser,
+
+if we put the nodes in a map, then address can be the key,
+
+Abstract Operations on the Tree:
+// select parent/firstChild/leftSibling/rightSibling
+// delete node
+// insert emptyNode/letter firstChild/leftSibling/rightSibling
+// should the insert commands select the new node?
+
+
+
+
+--children should be ordered, and js object attributes are not naturally ordered
+so it makes the most sense to always put children in an array
+
+Could implement everything:
+--incremental parser (text --> tree)
+--printing (tree --> text)
+--commands that change the tree directly (then reprint)
+--commands that change the text directly (then reparse)
+
+SIMPLE LANGUAGE GRAMMAR:
+Example program:
+
+natural = 0 | s natural
+
+sum n 0 = n
+sum n (s m) = s (sum n m)
+
+I will never be able to decide on the syntax,
+whatever I write for the syntax the first time,
+I need to force myself to implement that
+
+
+
+AUTOMATING THE BUILD PROCESS:

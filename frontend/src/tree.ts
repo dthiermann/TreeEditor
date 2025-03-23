@@ -1,6 +1,7 @@
 
 export type word = defName | parameter | name | constant;
 
+
 export class defName {
     content: letter[];
     parent: definition;
@@ -58,14 +59,16 @@ export class definition {
 
 export class module {
     kind: string;
-    children: definition[];
+    content: definition[];
 
     constructor() {
         this.kind = "module";
-        this.children = [];
+        this.content = [];
     }
 }
 
+// statement of the form
+// let name = value
 export class statement {
     kind: string;
     name: name;
@@ -147,6 +150,27 @@ function addLetterBefore(key : string, index : number, parent : word) {
 // currently, code assumes Map<string, sel : expression -> info >
 export let commandMap : Map<string, (sel : expression) => expression> = new Map();
 
+// create a command type
+// relativePosition is relative to selection
+// relativePosition = parent | firstChild | leftSibling | rightSibling | lastChild
+// insert (letter | otherNode) relativePosition
+// delete selectedNode (and change selection to what)
+// select relativePosition
+
+// node = compound | word | letter
+// compound has (parent : compound) (children: compound | word)
+// word has (parent : compound) (children: letter)
+// letter has (parent : word)
+
+// deleting content of node is different from deleting a node
+// the idea of empty nodes, you can have empty word nodes, and empty compound nodes
+// means word node, compound 
+// children stored in list
+// the list could be empty
+// word.children = ["w", "o", "r", "d"]
+// no parent refs and just keep track of selection address?
+// 
+
 commandMap.set("f", addNewChild);
 commandMap.set("p", selectParent);
 commandMap.set("j", getLeftSibling);
@@ -205,7 +229,7 @@ function insertAtLetterInTree(key : string, selection : letter) : expression {
 
 function addBlankDef(document : module) : defName {
     const blankdef = new definition(document);
-    document.children.push(blankdef);
+    document.content.push(blankdef);
     return blankdef.name;
 }
 

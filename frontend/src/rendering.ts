@@ -33,11 +33,11 @@ class displayChar {
 // prints the first def child of mod
 // doesn't highlight any children, even if they are selected
 export function printModule(mod : module, selectedNode : expression) {
-    if (mod.children.length == 0) {
+    if (mod.content.length == 0) {
 
     }
     else {
-        printDef(mod.children[0], 0, selectedNode);
+        printDef(mod.content[0], 0, selectedNode);
     }
 }
 
